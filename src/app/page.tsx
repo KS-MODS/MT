@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { App, Profile } from '@/types';
 import LayoutShell from '@/components/LayoutShell';
 import AppCard from '@/components/AppCard';
-import { Sparkles, Trophy, Plus, ShieldCheck, Flame, Compass, Star, Calendar, Download, RefreshCw, User } from 'lucide-react';
+import { Sparkles, Trophy, Plus, ShieldCheck, Flame, Compass, Star, Calendar, Download, RefreshCw, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function StoreHome() {
@@ -13,7 +13,20 @@ export default function StoreHome() {
   const [developers, setDevelopers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [activeBanner, setActiveBanner] = useState<any | null>(null);
+  const [banners, setBanners] = useState<any[]>([]);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Autoplay functionality for the banner carousel
+  useEffect(() => {
+    if (banners.length <= 1 || isHovered) return;
+
+    const interval = setInterval(() => {
+      setCurrentBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
+    }, 5000); // 5 seconds interval
+
+    return () => clearInterval(interval);
+  }, [banners.length, isHovered]);
 
   const categories = ['All', 'Games', 'Tools', 'Health', 'Music', 'Productivity', 'News'];
 
@@ -40,7 +53,7 @@ export default function StoreHome() {
 
         if (devsError) throw devsError;
 
-        // Fetch active featured banner
+        // Fetch active featured banners
         try {
           const { data: bannerData, error: bannerError } = await supabase
             .from('featured_banner')
@@ -50,15 +63,15 @@ export default function StoreHome() {
           if (bannerError) throw bannerError;
 
           const now = new Date();
-          const scheduledBanner = (bannerData as any[])?.find(b => {
+          const scheduledBanners = (bannerData as any[])?.filter(b => {
             if (b.scheduled_start && new Date(b.scheduled_start) > now) return false;
             if (b.scheduled_end && new Date(b.scheduled_end) < now) return false;
             return true;
           });
-          setActiveBanner(scheduledBanner || null);
+          setBanners(scheduledBanners || []);
         } catch (bannerError) {
           console.warn('featured_banner query failed. Empty hero section fallback.', bannerError);
-          setActiveBanner(null);
+          setBanners([]);
         }
 
         setApps(appsData as App[] || []);
@@ -94,101 +107,172 @@ export default function StoreHome() {
         {loading ? (
           <div className="w-full h-80 rounded-3xl skeleton" />
         ) : (
-          activeBanner && activeBanner.featured_app && (
-            <div className="group relative w-full min-h-[320px] md:h-[400px] rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl flex items-center p-6 md:p-12 transition-all duration-300">
-              
-              {/* Background Image */}
-              <div className="absolute inset-0 z-0 select-none pointer-events-none">
-                <picture>
-                  {activeBanner.mobile_background_image && (
-                    <source media="(max-w: 640px)" srcSet={activeBanner.mobile_background_image} />
-                  )}
-                  <img
-                    src={activeBanner.background_image || activeBanner.featured_app.banner_url || 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop'}
-                    alt="Hero Banner Background"
-                    className="w-full h-full object-cover opacity-30 scale-100 group-hover:scale-[1.03] transition-transform duration-[4000ms] ease-out"
-                    loading="lazy"
-                  />
-                </picture>
-                
-                {/* Overlay gradients */}
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-purple-500/10 opacity-60 mix-blend-overlay animate-gradient-shift" />
-              </div>
-
-              {/* Banner Content */}
-              <div className="relative z-10 max-w-2xl text-left space-y-4">
-                
-                <div className="flex flex-wrap gap-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-wider font-outfit">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Featured Application
-                  </div>
-                  {activeBanner.is_editors_choice && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-bold uppercase tracking-wider font-outfit">
-                      <Trophy className="w-3.5 h-3.5" />
-                      Editor's Choice
-                    </div>
-                  )}
-                  {activeBanner.is_trending && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold uppercase tracking-wider font-outfit">
-                      <Flame className="w-3.5 h-3.5" />
-                      Trending
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden shadow-xl flex-shrink-0">
-                    <img src={activeBanner.featured_app.icon_url || ''} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-2xl md:text-4xl font-extrabold font-outfit tracking-tight text-white truncate">
-                      {activeBanner.custom_title || activeBanner.featured_app.name}
-                    </h1>
-                    
-                    <div className="flex items-center gap-1 mt-1 text-sm text-slate-300">
-                      {activeBanner.featured_app.developer ? (
-                        <Link 
-                          href={`/developer/${activeBanner.featured_app.developer.username}`}
-                          className="hover:underline hover:text-blue-400 transition-colors flex items-center gap-1 font-semibold"
-                        >
-                          By {activeBanner.featured_app.developer.full_name}
-                          {(activeBanner.is_verified_dev || activeBanner.featured_app.developer.is_verified) && (
-                            <ShieldCheck className="w-4 h-4 text-blue-400" />
-                          )}
-                        </Link>
-                      ) : (
-                        <span>By Modded Team Developer</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed max-w-xl">
-                  {activeBanner.custom_description || activeBanner.featured_app.description}
-                </p>
-
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <Link 
-                    href={activeBanner.button_url || `/app/${activeBanner.featured_app.slug}`} 
-                    className="btn-primary py-2.5 px-6 font-bold text-sm bg-gradient-to-r from-blue-600 to-indigo-700 border-none shadow-lg shadow-blue-500/20 min-h-[44px]"
-                  >
-                    {activeBanner.button_text || 'View App Details'}
-                  </Link>
-
-                  {activeBanner.featured_app.apk_url && (
-                    <a
-                      href={activeBanner.featured_app.apk_url}
-                      className="px-5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition-all flex items-center gap-1.5 min-h-[44px]"
+          banners.length > 0 && (
+            <div 
+              className="group relative w-full min-h-[320px] md:h-[400px] rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl"
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              {/* Slides Container */}
+              <div className="relative w-full h-full min-h-[320px] md:h-[400px]">
+                {banners.map((banner, index) => {
+                  const isActive = index === currentBannerIndex;
+                  if (!banner.featured_app) return null;
+                  
+                  return (
+                    <div
+                      key={banner.id}
+                      className={`absolute inset-0 w-full h-full flex items-center p-6 md:p-12 transition-all duration-700 ease-in-out ${
+                        isActive 
+                          ? 'opacity-100 z-10 pointer-events-auto' 
+                          : 'opacity-0 z-0 pointer-events-none'
+                      }`}
                     >
-                      <Download className="w-4 h-4" />
-                      Download APK
-                    </a>
-                  )}
-                </div>
+                      {/* Background Image */}
+                      <div className="absolute inset-0 z-0 select-none pointer-events-none">
+                        <picture>
+                          {banner.mobile_background_image && (
+                            <source media="(max-w: 640px)" srcSet={banner.mobile_background_image} />
+                          )}
+                          <img
+                            src={banner.background_image || banner.featured_app.banner_url || 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop'}
+                            alt="Hero Banner Background"
+                            className={`w-full h-full object-cover opacity-30 transition-transform duration-[4000ms] ease-out ${
+                              isActive ? 'scale-[1.03]' : 'scale-100'
+                            }`}
+                            loading="lazy"
+                          />
+                        </picture>
+                        
+                        {/* Overlay gradients */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-purple-500/10 opacity-60 mix-blend-overlay animate-gradient-shift" />
+                      </div>
+
+                      {/* Banner Content */}
+                      <div className={`relative z-10 max-w-2xl text-left space-y-4 transition-all duration-700 delay-100 ${
+                        isActive ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+                      }`}>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-wider font-outfit">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Featured Application
+                          </div>
+                          {banner.is_editors_choice && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-bold uppercase tracking-wider font-outfit">
+                              <Trophy className="w-3.5 h-3.5" />
+                              Editor's Choice
+                            </div>
+                          )}
+                          {banner.is_trending && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold uppercase tracking-wider font-outfit">
+                              <Flame className="w-3.5 h-3.5" />
+                              Trending
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden shadow-xl flex-shrink-0">
+                            <img src={banner.featured_app.icon_url || ''} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                          <div className="min-w-0">
+                            <h1 className="text-2xl md:text-4xl font-extrabold font-outfit tracking-tight text-white truncate">
+                              {banner.custom_title || banner.featured_app.name}
+                            </h1>
+                            
+                            <div className="flex items-center gap-1 mt-1 text-sm text-slate-300">
+                              {banner.featured_app.developer ? (
+                                <Link 
+                                  href={`/developer/${banner.featured_app.developer.username}`}
+                                  className="hover:underline hover:text-blue-400 transition-colors flex items-center gap-1 font-semibold"
+                                >
+                                  By {banner.featured_app.developer.full_name}
+                                  {(banner.is_verified_dev || banner.featured_app.developer.is_verified) && (
+                                    <ShieldCheck className="w-4 h-4 text-blue-400" />
+                                  )}
+                                </Link>
+                              ) : (
+                                <span>By Modded Team Developer</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed max-w-xl">
+                          {banner.custom_description || banner.featured_app.description}
+                        </p>
+
+                        <div className="flex flex-wrap gap-3 pt-2">
+                          <Link 
+                            href={banner.button_url || `/app/${banner.featured_app.slug}`} 
+                            className="btn-primary py-2.5 px-6 font-bold text-sm bg-gradient-to-r from-blue-600 to-indigo-700 border-none shadow-lg shadow-blue-500/20 min-h-[44px]"
+                          >
+                            {banner.button_text || 'View App Details'}
+                          </Link>
+
+                          {banner.featured_app.apk_url && (
+                            <a
+                              href={banner.featured_app.apk_url}
+                              className="px-5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition-all flex items-center gap-1.5 min-h-[44px]"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download APK
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Navigation Controls (Chevrons) - Only show if > 1 banner */}
+              {banners.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentBannerIndex((prevIndex) => (prevIndex === 0 ? banners.length - 1 : prevIndex - 1));
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-slate-950/40 hover:bg-slate-950/75 border border-white/10 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-105 min-h-[40px] min-w-[40px]"
+                    aria-label="Previous banner"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-slate-950/40 hover:bg-slate-950/75 border border-white/10 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-105 min-h-[40px] min-w-[40px]"
+                    aria-label="Next banner"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+
+                  {/* Indicator Dots */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {banners.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentBannerIndex(idx);
+                        }}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          idx === currentBannerIndex 
+                            ? 'w-6 bg-blue-500' 
+                            : 'w-2 bg-white/40 hover:bg-white/70'
+                        }`}
+                        aria-label={`Go to slide ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )
         )}
