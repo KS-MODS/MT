@@ -1,0 +1,41 @@
+[load]
+#Ö¸¶¨ÊÇ·ñÔÚÎÄ¼þ¶Ô»°¿òÖÐÆôÓÃ
+#Specify whether or not to enable in the file dialog.
+folderExt=false
+#Ö¸¶¨ÊÇ·ñºöÂÔ´íÎó(¼´³öÏÖ´íÎó²»ÏÔÊ¾´íÎóµ¯´°)
+#Specify whether or not to ignore errors (i.e. not show error popups when errors occur).
+noerror=false
+[image]
+#Ö¸¶¨Í¼Æ¬ÊÇ·ñËæ»úÏÔÊ¾ Äú±ØÐë·ÅÈëÖÁÉÙÁ½ÕÅÍ¼Ïñ
+#Specifies whether the image is displayed randomly, you need to put at least 2 images
+random=true
+#ÊÇ·ñÆôÓÃÖ¸¶¨×Ô¶¨ÒåÎÄ¼þ¼ÐµÄÍ¼Æ¬
+#Enable custom specified folder pictures
+custom=false
+#Í¼Æ¬ÏÔÊ¾Î»ÖÃ 0=×óÉÏ½Ç 1=ÓÒÉÏ½Ç 2=×óÏÂ½Ç 3=ÓÒÏÂ½Ç 4=¾ÓÖÐ 5=Ëõ·Å 6=Ëõ·Å²¢Ìî³ä; Ä¬ÈÏÎª3 ÓÒÏÂ½Ç
+#Image display position
+posType=3
+#Í¼Æ¬µÄ²»Í¸Ã÷¶È ·¶Î§0-255
+#Alpha 0-255 of image
+imgAlpha=255
+#×Ô¶¨ÒåÍ¼Æ¬Ä¿Â¼¾ø¶ÔÂ·¾¶ (Îª¿ÕÔòÄ¬ÈÏ ./image)
+#Custom image folder absolute path (empty defaults to . /image)
+folder=
+
+#À¨ºÅÄÚÌîÈëÂ·¾¶ ÇëÏÈ½«Í¼Æ¬·ÅÈëImageÎÄ¼þ¼ÐÈ»ºó img= Ö¸¶¨ImageÎÄ¼þ¼ÐÀïµÄÎÄ¼þÃû ÊÇÎÄ¼þÃû²»ÊÇÍêÕûÂ·¾¶!
+#Please put the picture in the Image folder first, and then img=specify the file name in the Image folder Is the file name, not the full path!
+#Ä³Ð©ÌØÊâÎÄ¼þ¼ÐÂ·¾¶ÊÇCLSID ÀýÈç:
+#Some special folder paths are CLSID For example:
+#´ËµçÄÔ This PC
+#::{20D04FE0-3AEA-1069-A2D8-08002B30309D}
+#¿ìËÙ·ÃÎÊ Quick access
+#::{679F85CB-0220-4080-B29B-5540CC05AAB6}
+#ÍøÂç Network
+#::{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}
+
+#Ê¾Àý (Example)
+#[::{20D04FE0-3AEA-1069-A2D8-08002B30309D}]
+#img=myimage.png
+
+#[C:\Users\admin\Pictures\Camera Roll]
+#img=mypic.png
