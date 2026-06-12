@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { App, Profile } from '@/types';
 import { useApp } from '@/context/AppContext';
@@ -46,7 +47,8 @@ ChartJS.register(
 );
 
 export default function DeveloperPortal() {
-  const { user, profile } = useApp();
+  const { user, profile, loading: authLoading } = useApp();
+  const router = useRouter();
   const [apps, setApps] = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'my_apps' | 'upload'>('my_apps');
@@ -69,6 +71,12 @@ export default function DeveloperPortal() {
   const [apkFile, setApkFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/');
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (!user) return;

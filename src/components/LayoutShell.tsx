@@ -172,11 +172,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                         <div
                           key={n.id}
                           onClick={() => markAsRead(n.id)}
-                          className={`p-2.5 rounded-lg mb-1 cursor-pointer transition-colors text-left ${
-                            !n.is_read
+                          className={`p-2.5 rounded-lg mb-1 cursor-pointer transition-colors text-left ${!n.is_read
                               ? 'bg-blue-500/5 hover:bg-blue-500/10 border-l-2 border-blue-500'
                               : 'hover:bg-gray-50 dark:hover:bg-white/5'
-                          }`}
+                            }`}
                         >
                           <div className="flex justify-between items-start">
                             <span className="text-xs font-semibold text-gray-900 dark:text-white">{n.title}</span>
@@ -292,11 +291,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className={`flex items-center gap-3 px-4 py-3 text-xs font-semibold rounded-xl transition-all ${
-                    isActive
+                  className={`flex items-center gap-3 px-4 py-3 text-xs font-semibold rounded-xl transition-all ${isActive
                       ? 'bg-blue-500/10 text-blue-500 dark:text-blue-400 border-l-2 border-blue-500 shadow-sm shadow-blue-500/5'
                       : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {link.name}
@@ -354,7 +352,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                 </p>
                 <div className="flex items-center gap-3 pt-2">
                   <a
-                    href="#"
+                    href="t.me/moddedServer"
                     className="w-8 h-8 rounded-full border border-white/20 hover:border-yellow-400 hover:text-yellow-400 flex items-center justify-center transition-all bg-white/5 hover:bg-white/10"
                     aria-label="Facebook"
                   >
@@ -363,7 +361,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     </svg>
                   </a>
                   <a
-                    href="#"
+                    href="https://www.instagram.com/kartik_sharma_1186?igsh=MTF6d3VhMWxlZWNsaQ=="
                     className="w-8 h-8 rounded-full border border-white/20 hover:border-yellow-400 hover:text-yellow-400 flex items-center justify-center transition-all bg-white/5 hover:bg-white/10"
                     aria-label="Instagram"
                   >
@@ -374,7 +372,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     </svg>
                   </a>
                   <a
-                    href="#"
+                    href="chat.whatsapp.com/GgMnSikm9dBExgs3yWU7Su"
                     className="w-8 h-8 rounded-full border border-white/20 hover:border-yellow-400 hover:text-yellow-400 flex items-center justify-center transition-all bg-white/5 hover:bg-white/10"
                     aria-label="WhatsApp"
                   >
@@ -383,7 +381,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     </svg>
                   </a>
                   <a
-                    href="#"
+                    href="https://www.youtube.com/@kartik_sharma546"
                     className="w-8 h-8 rounded-full border border-white/20 hover:border-yellow-400 hover:text-yellow-400 flex items-center justify-center transition-all bg-white/5 hover:bg-white/10"
                     aria-label="YouTube"
                   >
@@ -443,11 +441,11 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                 <ul className="space-y-3 text-xs text-white/90">
                   <li className="flex items-start gap-2.5">
                     <MapPin className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                    <span>Noida, Uttar Pradesh, India</span>
+                    <span>Hamirpur HIMACHAL PARDASH(H.P)</span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <Mail className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-                    <a href="mailto:contact@moddedteam.com" className="hover:underline">contact@moddedteam.com</a>
+                    <a href="VIP.KARTIK@gmail.com" className="hover:underline">kartiksharma20081186@gmail.com</a>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <Phone className="w-4 h-4 text-yellow-400 flex-shrink-0" />
@@ -487,33 +485,30 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--sidebar-bg)] backdrop-blur-md border-t border-gray-200 dark:border-white/5 pb-safe pt-2 px-2 flex items-center justify-around z-[60]">
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${
-            pathname === '/'
+          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/'
               ? 'text-blue-500 dark:text-blue-400'
               : 'text-gray-400 dark:text-gray-500'
-          }`}
+            }`}
         >
           <Home className="w-5 h-5" />
           Home
         </Link>
         <Link
           href="/search"
-          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${
-            pathname === '/search'
+          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/search'
               ? 'text-blue-500 dark:text-blue-400'
               : 'text-gray-400 dark:text-gray-500'
-          }`}
+            }`}
         >
           <Search className="w-5 h-5" />
           Explore
         </Link>
         <Link
           href="/developer-portal"
-          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${
-            pathname === '/developer-portal'
+          className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/developer-portal'
               ? 'text-blue-500 dark:text-blue-400'
               : 'text-gray-400 dark:text-gray-500'
-          }`}
+            }`}
         >
           <FolderCode className="w-5 h-5" />
           Dev Portal
@@ -521,11 +516,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         {profile?.role === 'admin' ? (
           <Link
             href="/admin"
-            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${
-              pathname === '/admin'
+            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/admin'
                 ? 'text-red-500'
                 : 'text-gray-400 dark:text-gray-500'
-            }`}
+              }`}
           >
             <ShieldAlert className="w-5 h-5" />
             Admin
@@ -533,11 +527,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         ) : (
           <Link
             href="/profile"
-            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${
-              pathname === '/profile'
+            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/profile'
                 ? 'text-blue-500 dark:text-blue-400'
                 : 'text-gray-400 dark:text-gray-500'
-            }`}
+              }`}
           >
             <User className="w-5 h-5" />
             Profile
@@ -586,11 +579,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     key={link.name}
                     href={link.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${
-                      isActive
+                    className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${isActive
                         ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
                         : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-5 h-5" />
                     {link.name}
@@ -604,11 +596,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                   <Link
                     href="/profile"
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${
-                      pathname === '/profile'
+                    className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${pathname === '/profile'
                         ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
                         : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
-                    }`}
+                      }`}
                   >
                     <User className="w-5 h-5" />
                     My Profile

@@ -64,6 +64,26 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErrorMsg('Please enter your email first to reset your password.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      alert('Password reset email sent! Check your inbox.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const quickLogin = async (roleType: 'admin' | 'developer' | 'user') => {
     setLoading(true);
     setErrorMsg('');
@@ -206,6 +226,17 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 className="w-full pl-10 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-800 bg-white"
               />
             </div>
+            {!isSignUp && (
+              <div className="flex justify-end mt-1">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-[10px] text-blue-500 hover:underline font-bold"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
           </div>
 
           <button

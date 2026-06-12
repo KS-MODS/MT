@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import LayoutShell from '@/components/LayoutShell';
@@ -26,7 +27,8 @@ import {
 } from 'lucide-react';
 
 export default function UserProfilePage() {
-  const { user, profile, refreshProfile } = useApp();
+  const { user, profile, refreshProfile, loading } = useApp();
+  const router = useRouter();
 
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -55,6 +57,12 @@ export default function UserProfilePage() {
       setAvatarUrl(profile.avatar_url || '');
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     if (!user) return;
