@@ -141,6 +141,23 @@ export default function DeveloperPortal() {
     }
 
     // Validation
+    if (!appName.trim()) {
+      alert('Please enter an application name.');
+      return;
+    }
+    if (!version.trim()) {
+      alert('Please enter a version code.');
+      return;
+    }
+    if (!category.trim()) {
+      alert('Please select a category.');
+      return;
+    }
+    if (!description.trim()) {
+      alert('Please enter a description.');
+      return;
+    }
+
     if (downloadType === 'link') {
       if (!downloadUrl.trim()) {
         alert('Please enter a download URL.');
@@ -193,30 +210,38 @@ export default function DeveloperPortal() {
       // Create slug from name
       const slug = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
+      const insertPayload = {
+        developer_id: user.id,
+        name: appName,
+        slug: slug,
+        description: description,
+        version: version,
+        category: category,
+        website_url: websiteUrl || null,
+        changelog: changelog || null,
+        icon_url: iconUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=100&auto=format&fit=crop',
+        banner_url: bannerUrl || 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=600&auto=format&fit=crop',
+        apk_url: apkUrl || null,
+        download_type: downloadType,
+        download_url: downloadType === 'link' ? downloadUrl : null,
+        package_name: downloadType === 'link' && packageName ? packageName : null,
+        status: 'pending' // Admin must approve
+      };
+      console.log('Inserting app submission payload:', insertPayload);
+
       // Insert app record
       const { data, error } = await supabase
         .from('apps')
-        .insert({
-          developer_id: user.id,
-          name: appName,
-          slug: slug,
-          description: description,
-          version: version,
-          category: category,
-          website_url: websiteUrl || null,
-          changelog: changelog || null,
-          icon_url: iconUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=100&auto=format&fit=crop',
-          banner_url: bannerUrl || 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=600&auto=format&fit=crop',
-          apk_url: apkUrl || null,
-          download_type: downloadType,
-          download_url: downloadType === 'link' ? downloadUrl : null,
-          package_name: downloadType === 'link' && packageName ? packageName : null,
-          status: 'pending' // Admin must approve
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error inserting app submission:', error);
+        throw error;
+      }
+
+      console.log('App submission successfully inserted:', data);
 
       // Add to screenshot gallery if banner uploaded
       if (bannerUrl && data) {

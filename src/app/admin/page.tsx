@@ -111,25 +111,45 @@ export default function AdminDashboard() {
       setLoading(true);
 
       // Fetch all apps with developer
-      const { data: appsData } = await supabase
+      console.log('Admin Dashboard: Fetching all apps...');
+      const { data: appsData, error: appsError } = await supabase
         .from('apps')
         .select('*, developer:profiles(*)');
       
+      if (appsError) {
+        console.error('Supabase error loading apps for admin dashboard:', appsError);
+        throw appsError;
+      }
+      
       const appsList = (appsData as App[]) || [];
+      console.log('Admin Dashboard: Successfully fetched apps:', appsList);
+      console.log('Admin Dashboard: Pending apps:', appsList.filter(a => a.status === 'pending'));
       setApps(appsList);
 
       // Fetch all profiles
-      const { data: profilesData } = await supabase
+      console.log('Admin Dashboard: Fetching all profiles...');
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
+
+      if (profilesError) {
+        console.error('Supabase error loading profiles for admin dashboard:', profilesError);
+        throw profilesError;
+      }
 
       const profilesList = (profilesData as Profile[]) || [];
       setProfiles(profilesList);
 
       // Fetch all reports with app and reporter
-      const { data: reportsData } = await supabase
+      console.log('Admin Dashboard: Fetching all reports...');
+      const { data: reportsData, error: reportsError } = await supabase
         .from('reports')
         .select('*, app:apps(*), user:profiles(*)');
+
+      if (reportsError) {
+        console.error('Supabase error loading reports for admin dashboard:', reportsError);
+        throw reportsError;
+      }
 
       const reportsList = (reportsData as Report[]) || [];
       setReports(reportsList);
@@ -907,7 +927,28 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <h4 className="text-sm font-extrabold text-gray-900 dark:text-white font-outfit">{app.name}</h4>
-                            <p className="text-[10px] text-gray-500">v{app.version} • {app.category} • Developer: {app.developer?.full_name}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span className="text-[10px] text-gray-500">v{app.version} • {app.category} • Developer: {app.developer?.full_name}</span>
+                              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                app.download_type === 'link'
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/25'
+                                  : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25'
+                              }`}>
+                                {app.download_type === 'link' ? 'External Link' : 'APK Upload'}
+                              </span>
+                            </div>
+                            {app.download_type === 'link' && app.download_url && (
+                              <div className="mt-1">
+                                <a
+                                  href={app.download_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-blue-400 hover:underline inline-flex items-center gap-1"
+                                >
+                                  Download Link: {app.download_url}
+                                </a>
+                              </div>
+                            )}
                             <p className="text-xs text-gray-400 mt-2 max-w-xl line-clamp-2 leading-relaxed">{app.description}</p>
                           </div>
                         </div>
