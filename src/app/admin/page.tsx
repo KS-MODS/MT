@@ -59,7 +59,25 @@ export default function AdminDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'stats' | 'moderate' | 'developers' | 'users' | 'reports' | 'featured_banner'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'moderate' | 'manage_apps' | 'developers' | 'users' | 'reports' | 'featured_banner'>('stats');
+
+  // Manage Apps States
+  const [editingApp, setEditingApp] = useState<App | null>(null);
+  const [submittingAppEdit, setSubmittingAppEdit] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'file' | 'link'>('all');
+
+  // Edit App Form fields
+  const [editAppName, setEditAppName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editVersion, setEditVersion] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editPackageName, setEditPackageName] = useState('');
+  const [editDownloadType, setEditDownloadType] = useState<'file' | 'link'>('file');
+  const [editDownloadUrl, setEditDownloadUrl] = useState('');
+  const [editIconFile, setEditIconFile] = useState<File | null>(null);
+  const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
+  const [editApkFile, setEditApkFile] = useState<File | null>(null);
 
   // Featured Banner States
   const [banners, setBanners] = useState<FeaturedBanner[]>([]);
@@ -246,6 +264,156 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleEditAppSelect = (app: App) => {
+    setEditingApp(app);
+    setEditAppName(app.name || '');
+    setEditDescription(app.description || '');
+    setEditVersion(app.version || '');
+    setEditCategory(app.category || 'Games');
+    setEditPackageName(app.package_name || '');
+    setEditDownloadType(app.download_type || 'file');
+    setEditDownloadUrl(app.download_url || '');
+    setEditIconFile(null);
+    setEditBannerFile(null);
+    setEditApkFile(null);
+  };
+
+  const uploadEditFile = async (file: File, bucket: string): Promise<string | null> => {
+    if (!user) return null;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+    if (error) {
+      console.error(`Error uploading file to ${bucket}:`, error);
+      return null;
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleUpdateApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingApp || !user) return;
+
+    if (editDownloadType === 'link') {
+      if (!editDownloadUrl.trim()) {
+        alert('Please enter a download URL.');
+        return;
+      }
+      try {
+        new URL(editDownloadUrl);
+      } catch (_) {
+        alert('Please enter a valid URL (starting with http:// or https://) for the download link.');
+        return;
+      }
+    } else {
+      if (!editingApp.apk_url && !editApkFile) {
+        alert('Please upload an APK file or select Link download type.');
+        return;
+      }
+    }
+
+    setSubmittingAppEdit(true);
+
+    try {
+      let iconUrl = editingApp.icon_url;
+      let bannerUrl = editingApp.banner_url;
+      let apkUrl = editingApp.apk_url;
+
+      if (editIconFile) {
+        const url = await uploadEditFile(editIconFile, 'app-images');
+        if (url) iconUrl = url;
+      }
+
+      if (editBannerFile) {
+        const url = await uploadEditFile(editBannerFile, 'app-images');
+        if (url) {
+          bannerUrl = url;
+          await supabase.from('screenshots').insert({
+            app_id: editingApp.id,
+            image_url: url
+          });
+        }
+      }
+
+      if (editDownloadType === 'file' && editApkFile) {
+        const url = await uploadEditFile(editApkFile, 'apks');
+        if (url) apkUrl = url;
+      }
+
+      const payload: any = {
+        name: editAppName,
+        slug: editAppName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+        version: editVersion,
+        category: editCategory,
+        description: editDescription,
+        download_type: editDownloadType,
+        package_name: editDownloadType === 'link' && editPackageName ? editPackageName : null,
+        icon_url: iconUrl,
+        banner_url: bannerUrl,
+        updated_at: new Date().toISOString()
+      };
+
+      if (editDownloadType === 'link') {
+        payload.download_url = editDownloadUrl;
+        payload.apk_url = null;
+      } else {
+        payload.download_url = null;
+        payload.apk_url = apkUrl;
+      }
+
+      const { data, error } = await supabase
+        .from('apps')
+        .update(payload)
+        .eq('id', editingApp.id)
+        .select('*, developer:profiles(*)')
+        .single();
+
+      if (error) throw error;
+
+      alert('App updated successfully!');
+      setApps(prev => prev.map(a => a.id === editingApp.id ? { ...a, ...data } : a));
+      setEditingApp(null);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to update app details.');
+    } finally {
+      setSubmittingAppEdit(false);
+    }
+  };
+
+  const handleDeleteApp = async (appId: string) => {
+    if (!confirm('Are you sure you want to delete this application? This will also delete all reviews, comments, and screenshots related to it.')) {
+      return;
+    }
+
+    try {
+      await supabase.from('screenshots').delete().eq('app_id', appId);
+      await supabase.from('reviews').delete().eq('app_id', appId);
+      await supabase.from('comments').delete().eq('app_id', appId);
+      await supabase.from('likes').delete().eq('app_id', appId);
+      await supabase.from('downloads').delete().eq('app_id', appId);
+      await supabase.from('favorites').delete().eq('app_id', appId);
+      await supabase.from('reports').delete().eq('app_id', appId);
+      await supabase.from('featured_banner').delete().eq('featured_app_id', appId);
+
+      const { error } = await supabase.from('apps').delete().eq('id', appId);
+      if (error) throw error;
+
+      alert('App deleted successfully!');
+      setApps(prev => prev.filter(a => a.id !== appId));
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to delete app.');
+    }
+  };
+
   const startNewBanner = () => {
     setEditingBanner({
       featured_app_id: '',
@@ -348,6 +516,7 @@ export default function AdminDashboard() {
             {[
               { id: 'stats', label: 'Stats Hub' },
               { id: 'moderate', label: `App Moderation (${pendingApps.length})` },
+              { id: 'manage_apps', label: 'Manage Apps' },
               { id: 'developers', label: 'Verifications' },
               { id: 'users', label: 'User Roles' },
               { id: 'reports', label: `Reports (${reports.filter(r => r.status === 'pending').length})` },
@@ -411,6 +580,314 @@ export default function AdminDashboard() {
                     <Line data={chartData} options={chartOptions} />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'manage_apps' && (
+              <div className="space-y-6">
+                {editingApp ? (
+                  /* Admin editing an app details form */
+                  <form onSubmit={handleUpdateApp} className="glass-card p-6 md:p-8 space-y-6">
+                    <div className="flex justify-between items-center border-b border-gray-100 dark:border-white/5 pb-3">
+                      <h3 className="text-md font-bold font-outfit text-gray-900 dark:text-white">
+                        Edit Application: {editingApp.name}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setEditingApp(null)}
+                        className="text-gray-400 hover:text-white text-xs font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Application Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={editAppName}
+                          onChange={(e) => setEditAppName(e.target.value)}
+                          placeholder="Application Name"
+                          className="w-full px-3 py-2 text-xs glass-input"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Version</label>
+                          <input
+                            type="text"
+                            required
+                            value={editVersion}
+                            onChange={(e) => setEditVersion(e.target.value)}
+                            placeholder="1.0.0"
+                            className="w-full px-3 py-2 text-xs glass-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Category</label>
+                          <select
+                            value={editCategory}
+                            onChange={(e) => setEditCategory(e.target.value)}
+                            className="w-full px-3 py-2 text-xs glass-input select-arrow"
+                          >
+                            <option value="Games">Games</option>
+                            <option value="Tools">Tools</option>
+                            <option value="Health">Health</option>
+                            <option value="Music">Music</option>
+                            <option value="Productivity">Productivity</option>
+                            <option value="News">News</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Download Type Selection */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Download Storage Method</label>
+                      <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 w-full max-w-xs">
+                        <button
+                          type="button"
+                          onClick={() => setEditDownloadType('file')}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${
+                            editDownloadType === 'file'
+                              ? 'bg-blue-500 text-white shadow-md'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Store APK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditDownloadType('link')}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${
+                            editDownloadType === 'link'
+                              ? 'bg-blue-500 text-white shadow-md'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          External Link
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {editDownloadType === 'link' ? (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Download URL</label>
+                            <input
+                              type="url"
+                              required
+                              value={editDownloadUrl}
+                              onChange={(e) => setEditDownloadUrl(e.target.value)}
+                              placeholder="https://example.com/app.apk"
+                              className="w-full px-3 py-2 text-xs glass-input"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Package Name (Optional)</label>
+                            <input
+                              type="text"
+                              value={editPackageName}
+                              onChange={(e) => setEditPackageName(e.target.value)}
+                              placeholder="com.example.myapp"
+                              className="w-full px-3 py-2 text-xs glass-input"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Update APK File (Optional)</label>
+                          <input
+                            type="file"
+                            accept=".apk"
+                            onChange={(e) => setEditApkFile(e.target.files?.[0] || null)}
+                            className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                          />
+                          {editingApp.apk_url && (
+                            <span className="block text-[10px] text-gray-500 mt-1 truncate">Current APK: {editingApp.apk_url}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Description</label>
+                      <textarea
+                        required
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        placeholder="App capabilities and details..."
+                        className="w-full p-3 text-xs glass-input h-28"
+                      />
+                    </div>
+
+                    {/* Graphics Upload Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-white/5">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Update App Icon (.png/.jpg - Optional)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setEditIconFile(e.target.files?.[0] || null)}
+                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Update Banner Image (.png/.jpg - Optional)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
+                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingApp(null)}
+                        className="px-4 py-2 border border-white/10 hover:bg-white/5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingAppEdit}
+                        className="btn-primary py-2 px-6 text-xs font-bold"
+                      >
+                        {submittingAppEdit ? 'Saving...' : 'Save App Details'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  /* Search, Filter and App list */
+                  <div className="glass-card p-6 space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-md font-bold font-outfit">Manage Applications</h3>
+                        <p className="text-xs text-gray-500">Edit, convert storage methods, and delete platform packages</p>
+                      </div>
+
+                      {/* Controls */}
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-none sm:w-48">
+                          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Search apps..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs glass-input"
+                          />
+                        </div>
+                        <select
+                          value={typeFilter}
+                          onChange={(e) => setTypeFilter(e.target.value as any)}
+                          className="px-3 py-1.5 text-xs glass-input select-arrow sm:w-32"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="file">APK Storage</option>
+                          <option value="link">External Link</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Apps Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs text-gray-400 border-collapse min-w-[700px]">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-white/5 pb-2 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                            <th className="py-2.5">Application</th>
+                            <th>Package / Slug</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th>Downloads</th>
+                            <th>Status</th>
+                            <th className="text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                          {apps
+                            .filter((app) => {
+                              const matchQuery =
+                                app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                app.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                (app.package_name && app.package_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                                (app.developer?.full_name && app.developer.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
+                              
+                              const matchType =
+                                typeFilter === 'all' ||
+                                (typeFilter === 'file' && (app.download_type === 'file' || !app.download_type)) ||
+                                (typeFilter === 'link' && app.download_type === 'link');
+
+                              return matchQuery && matchType;
+                            })
+                            .map((app) => (
+                              <tr key={app.id} className="hover:bg-white/5">
+                                <td className="py-3 flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded bg-slate-900 border border-white/5 overflow-hidden flex-shrink-0">
+                                    <img src={app.icon_url || ''} alt="" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-gray-900 dark:text-white">{app.name}</p>
+                                    <span className="text-[10px] text-gray-500">v{app.version} • by @{app.developer?.username}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  {app.download_type === 'link' && app.package_name ? (
+                                    <span className="font-mono text-[10px] text-gray-300 select-all">{app.package_name}</span>
+                                  ) : (
+                                    <span className="text-gray-500 font-mono text-[10px]">{app.slug}</span>
+                                  )}
+                                </td>
+                                <td>{app.category}</td>
+                                <td>
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${
+                                    app.download_type === 'link'
+                                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/25'
+                                      : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/25'
+                                  }`}>
+                                    {app.download_type === 'link' ? 'Link Redirect' : 'APK Storage'}
+                                  </span>
+                                </td>
+                                <td className="font-semibold text-gray-900 dark:text-white">{app.download_count}</td>
+                                <td>
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                    app.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                                    app.status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' :
+                                    'bg-red-500/15 text-red-400 border border-red-500/25'
+                                  }`}>
+                                    {app.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={() => handleEditAppSelect(app)}
+                                      className="px-2 py-1 bg-blue-500/10 border border-blue-500/25 hover:bg-blue-500/20 text-blue-400 rounded text-[10px] font-semibold transition-all"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteApp(app.id)}
+                                      className="px-2 py-1 bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-semibold transition-all"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

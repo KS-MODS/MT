@@ -35,3 +35,9 @@ CREATE POLICY "Allow admin full access" ON featured_banner
             WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
         )
     );
+
+-- Migration to support External Download Links in the apps table
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS download_type VARCHAR(50) DEFAULT 'file';
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS download_url TEXT NULL;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS package_name VARCHAR(255) NULL;
+

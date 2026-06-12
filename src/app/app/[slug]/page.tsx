@@ -187,8 +187,10 @@ export default function AppDetailsPage({ params }: PageProps) {
       // Increment local count
       setApp(prev => prev ? { ...prev, download_count: prev.download_count + 1 } : null);
 
-      // Trigger file download
-      if (app.apk_url) {
+      // Trigger file download or redirect based on download_type
+      if (app.download_type === 'link' && app.download_url) {
+        window.open(app.download_url, '_blank');
+      } else if (app.apk_url) {
         window.open(app.apk_url, '_blank');
       } else {
         // Fallback simulate download
@@ -615,6 +617,12 @@ export default function AppDetailsPage({ params }: PageProps) {
                   <span className="text-slate-400">Version</span>
                   <span className="font-semibold text-slate-700">{app.version}</span>
                 </div>
+                {app.package_name && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-400">Package Name</span>
+                    <span className="font-semibold text-slate-700 select-all">{app.package_name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1.5 border-b border-slate-100">
                   <span className="text-slate-400">Downloads</span>
                   <span className="font-semibold text-slate-700">{app.download_count}</span>

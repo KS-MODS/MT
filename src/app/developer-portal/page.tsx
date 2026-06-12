@@ -64,6 +64,9 @@ export default function DeveloperPortal() {
   const [category, setCategory] = useState('Games');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [changelog, setChangelog] = useState('');
+  const [downloadType, setDownloadType] = useState<'file' | 'link'>('file');
+  const [downloadUrl, setDownloadUrl] = useState('');
+  const [packageName, setPackageName] = useState('');
   
   // File upload states
   const [iconFile, setIconFile] = useState<File | null>(null);
@@ -137,6 +140,25 @@ export default function DeveloperPortal() {
       return;
     }
 
+    // Validation
+    if (downloadType === 'link') {
+      if (!downloadUrl.trim()) {
+        alert('Please enter a download URL.');
+        return;
+      }
+      try {
+        new URL(downloadUrl);
+      } catch (_) {
+        alert('Please enter a valid URL (starting with http:// or https://) for the download link.');
+        return;
+      }
+    } else {
+      if (!apkFile) {
+        alert('Please select an APK file to upload.');
+        return;
+      }
+    }
+
     setSubmitting(true);
     setUploadProgress(10);
 
@@ -159,8 +181,8 @@ export default function DeveloperPortal() {
         if (url) bannerUrl = url;
       }
 
-      // Upload APK
-      if (apkFile) {
+      // Upload APK (only if file)
+      if (downloadType === 'file' && apkFile) {
         setUploadProgress(85);
         const url = await uploadFile(apkFile, 'apks');
         if (url) apkUrl = url;
@@ -186,6 +208,9 @@ export default function DeveloperPortal() {
           icon_url: iconUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=100&auto=format&fit=crop',
           banner_url: bannerUrl || 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=600&auto=format&fit=crop',
           apk_url: apkUrl || null,
+          download_type: downloadType,
+          download_url: downloadType === 'link' ? downloadUrl : null,
+          package_name: downloadType === 'link' && packageName ? packageName : null,
           status: 'pending' // Admin must approve
         })
         .select()
@@ -209,6 +234,9 @@ export default function DeveloperPortal() {
       setVersion('1.0.0');
       setWebsiteUrl('');
       setChangelog('');
+      setDownloadType('file');
+      setDownloadUrl('');
+      setPackageName('');
       setIconFile(null);
       setBannerFile(null);
       setApkFile(null);
@@ -467,6 +495,32 @@ export default function DeveloperPortal() {
               Upload Package & Graphics
             </h3>
 
+            {/* Download Type Toggle */}
+            <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 w-full max-w-xs mb-6">
+              <button
+                type="button"
+                onClick={() => setDownloadType('file')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold text-center transition-all ${
+                  downloadType === 'file'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Upload APK
+              </button>
+              <button
+                type="button"
+                onClick={() => setDownloadType('link')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold text-center transition-all ${
+                  downloadType === 'link'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Add Link
+              </button>
+            </div>
+
             <form onSubmit={handleAppUpload} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -511,6 +565,32 @@ export default function DeveloperPortal() {
                 </div>
               </div>
 
+              {downloadType === 'link' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Download URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={downloadUrl}
+                      onChange={(e) => setDownloadUrl(e.target.value)}
+                      placeholder="https://example.com/path/to/app.apk"
+                      className="w-full px-3 py-2 text-xs glass-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Package Name (Optional)</label>
+                    <input
+                      type="text"
+                      value={packageName}
+                      onChange={(e) => setPackageName(e.target.value)}
+                      placeholder="com.example.myapp"
+                      className="w-full px-3 py-2 text-xs glass-input"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Full Description</label>
                 <textarea
@@ -522,31 +602,33 @@ export default function DeveloperPortal() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Website URL (Optional)</label>
-                  <input
-                    type="url"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    placeholder="https://fitpulse.net"
-                    className="w-full px-3 py-2 text-xs glass-input"
-                  />
+              {downloadType === 'file' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Website URL (Optional)</label>
+                    <input
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      placeholder="https://fitpulse.net"
+                      className="w-full px-3 py-2 text-xs glass-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Changelog Notes (Optional)</label>
+                    <input
+                      type="text"
+                      value={changelog}
+                      onChange={(e) => setChangelog(e.target.value)}
+                      placeholder="Initial release details..."
+                      className="w-full px-3 py-2 text-xs glass-input"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Changelog Notes (Optional)</label>
-                  <input
-                    type="text"
-                    value={changelog}
-                    onChange={(e) => setChangelog(e.target.value)}
-                    placeholder="Initial release details..."
-                    className="w-full px-3 py-2 text-xs glass-input"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* File Upload Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-100 dark:border-white/5">
+              <div className={`grid grid-cols-1 ${downloadType === 'file' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6 pt-4 border-t border-gray-100 dark:border-white/5`}>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">App Icon File (.png/.jpg)</label>
                   <input
@@ -567,22 +649,24 @@ export default function DeveloperPortal() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">APK File Upload (.apk)</label>
-                  <input
-                    type="file"
-                    accept=".apk"
-                    onChange={(e) => setApkFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                  />
-                </div>
+                {downloadType === 'file' && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">APK File Upload (.apk)</label>
+                    <input
+                      type="file"
+                      accept=".apk"
+                      onChange={(e) => setApkFile(e.target.files?.[0] || null)}
+                      className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Progress bar */}
               {submitting && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase">
-                    <span>Uploading APK and Graphics...</span>
+                    <span>{downloadType === 'file' ? 'Uploading APK and Graphics...' : 'Uploading Graphics...'}</span>
                     <span>{uploadProgress}%</span>
                   </div>
                   <div className="w-full h-2 rounded bg-white/5 overflow-hidden">
@@ -610,7 +694,6 @@ export default function DeveloperPortal() {
             </form>
           </div>
         )}
-
       </div>
     </LayoutShell>
   );

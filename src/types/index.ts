@@ -40,6 +40,9 @@ export interface App {
   is_featured: boolean;
   created_at: string;
   updated_at: string;
+  download_type?: 'file' | 'link';
+  download_url?: string | null;
+  package_name?: string | null;
   // Relations
   developer?: Profile;
   screenshots?: Screenshot[];

@@ -173,8 +173,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                           key={n.id}
                           onClick={() => markAsRead(n.id)}
                           className={`p-2.5 rounded-lg mb-1 cursor-pointer transition-colors text-left ${!n.is_read
-                              ? 'bg-blue-500/5 hover:bg-blue-500/10 border-l-2 border-blue-500'
-                              : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                            ? 'bg-blue-500/5 hover:bg-blue-500/10 border-l-2 border-blue-500'
+                            : 'hover:bg-gray-50 dark:hover:bg-white/5'
                             }`}
                         >
                           <div className="flex justify-between items-start">
@@ -292,8 +292,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                   key={link.name}
                   href={link.href}
                   className={`flex items-center gap-3 px-4 py-3 text-xs font-semibold rounded-xl transition-all ${isActive
-                      ? 'bg-blue-500/10 text-blue-500 dark:text-blue-400 border-l-2 border-blue-500 shadow-sm shadow-blue-500/5'
-                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
+                    ? 'bg-blue-500/10 text-blue-500 dark:text-blue-400 border-l-2 border-blue-500 shadow-sm shadow-blue-500/5'
+                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -486,8 +486,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         <Link
           href="/"
           className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/'
-              ? 'text-blue-500 dark:text-blue-400'
-              : 'text-gray-400 dark:text-gray-500'
+            ? 'text-blue-500 dark:text-blue-400'
+            : 'text-gray-400 dark:text-gray-500'
             }`}
         >
           <Home className="w-5 h-5" />
@@ -496,8 +496,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         <Link
           href="/search"
           className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/search'
-              ? 'text-blue-500 dark:text-blue-400'
-              : 'text-gray-400 dark:text-gray-500'
+            ? 'text-blue-500 dark:text-blue-400'
+            : 'text-gray-400 dark:text-gray-500'
             }`}
         >
           <Search className="w-5 h-5" />
@@ -506,8 +506,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         <Link
           href="/developer-portal"
           className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/developer-portal'
-              ? 'text-blue-500 dark:text-blue-400'
-              : 'text-gray-400 dark:text-gray-500'
+            ? 'text-blue-500 dark:text-blue-400'
+            : 'text-gray-400 dark:text-gray-500'
             }`}
         >
           <FolderCode className="w-5 h-5" />
@@ -517,8 +517,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           <Link
             href="/admin"
             className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/admin'
-                ? 'text-red-500'
-                : 'text-gray-400 dark:text-gray-500'
+              ? 'text-red-500'
+              : 'text-gray-400 dark:text-gray-500'
               }`}
           >
             <ShieldAlert className="w-5 h-5" />
@@ -528,8 +528,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           <Link
             href="/profile"
             className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/profile'
-                ? 'text-blue-500 dark:text-blue-400'
-                : 'text-gray-400 dark:text-gray-500'
+              ? 'text-blue-500 dark:text-blue-400'
+              : 'text-gray-400 dark:text-gray-500'
               }`}
           >
             <User className="w-5 h-5" />
@@ -580,8 +580,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     href={link.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${isActive
-                        ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
-                        : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
+                      ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
+                      : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
                       }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -597,8 +597,8 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                     href="/profile"
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-4 px-6 py-4 text-sm font-bold transition-all relative ${pathname === '/profile'
-                        ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
-                        : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
+                      ? 'text-yellow-400 bg-white/5 border-l-4 border-yellow-400'
+                      : 'text-white/95 hover:text-yellow-300 hover:bg-white/5'
                       }`}
                   >
                     <User className="w-5 h-5" />
