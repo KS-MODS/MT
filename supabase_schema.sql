@@ -41,3 +41,8 @@ ALTER TABLE apps ADD COLUMN IF NOT EXISTS download_type VARCHAR(50) DEFAULT 'fil
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS download_url TEXT NULL;
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS package_name VARCHAR(255) NULL;
 
+-- Migration to support direct URL uploads for App Icon, Banner, and Gallery screenshots
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS gallery_urls TEXT[] DEFAULT '{}';
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS image_source_type VARCHAR(50) DEFAULT 'database_upload';
+
+

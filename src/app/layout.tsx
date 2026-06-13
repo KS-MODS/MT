@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
 
-const inter = Inter({
-  subsets: ['latin'],
+const inter = {
   variable: '--font-inter',
-});
+};
 
 export const metadata: Metadata = {
-  title: 'Modded Team | Play Store Inspired Android App Hub',
+  title: 'Modded Team | KARTIK-SHARMA',
   description: 'Download, upload, review, and follow developers in Modded Team - the ultimate APK sharing community. Features ratings, verified badges, and developers leaderboards.',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 };

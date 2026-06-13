@@ -123,6 +123,13 @@ export default function AdminDashboard() {
   const [editIsFeatured, setEditIsFeatured] = useState(false);
   const [editIsEditorChoice, setEditIsEditorChoice] = useState(false);
 
+  // Edit App Form Image Tab & URLs
+  const [editImageSourceTab, setEditImageSourceTab] = useState<'upload' | 'url'>('upload');
+  const [editIconUrlInput, setEditIconUrlInput] = useState('');
+  const [editBannerUrlInput, setEditBannerUrlInput] = useState('');
+  const [editGalleryUrlInputs, setEditGalleryUrlInputs] = useState<string[]>(['', '', '', '']);
+  const [editScreenshotFiles, setEditScreenshotFiles] = useState<FileList | null>(null);
+
   // Featured Banner States
   const [banners, setBanners] = useState<FeaturedBanner[]>([]);
   const [editingBanner, setEditingBanner] = useState<Partial<FeaturedBanner> | null>(null);
@@ -511,7 +518,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditAppSelect = (app: App) => {
+  const handleEditAppSelect = async (app: App) => {
     setEditingApp(app);
     setEditAppName(app.name || '');
     setEditDescription(app.description || '');
@@ -523,10 +530,34 @@ export default function AdminDashboard() {
     setEditIconFile(null);
     setEditBannerFile(null);
     setEditApkFile(null);
+    setEditScreenshotFiles(null);
     setEditFileType(app.file_type || 'APK');
     setEditFileSize(app.file_size || '0 MB');
     setEditIsFeatured(app.is_featured || false);
     setEditIsEditorChoice(app.is_editor_choice || false);
+
+    // Image URL inputs & tabs
+    setEditImageSourceTab(app.image_source_type || 'database_upload');
+    setEditIconUrlInput(app.icon_url || '');
+    setEditBannerUrlInput(app.banner_url || '');
+
+    let currentGalleryUrls = app.gallery_urls || [];
+    if (currentGalleryUrls.length === 0) {
+      try {
+        const { data } = await supabase
+          .from('screenshots')
+          .select('image_url')
+          .eq('app_id', app.id);
+        if (data && data.length > 0) {
+          currentGalleryUrls = data.map(s => s.image_url);
+        }
+      } catch (err) {
+        console.error('Failed to load screenshots for editing fallback:', err);
+      }
+    }
+    const padded = [...currentGalleryUrls];
+    while (padded.length < 4) padded.push('');
+    setEditGalleryUrlInputs(padded);
   };
 
   const uploadEditFile = async (file: File, bucket: string): Promise<string | null> => {
@@ -570,18 +601,52 @@ export default function AdminDashboard() {
       }
     }
 
+    // Basic URL validations
+    if (!editIconFile && editIconUrlInput.trim()) {
+      try {
+        new URL(editIconUrlInput.trim());
+      } catch (_) {
+        alert('Please enter a valid App Icon URL.');
+        return;
+      }
+    }
+    if (!editBannerFile && editBannerUrlInput.trim()) {
+      try {
+        new URL(editBannerUrlInput.trim());
+      } catch (_) {
+        alert('Please enter a valid App Banner URL.');
+        return;
+      }
+    }
+    const activeGalleryUrls = editGalleryUrlInputs.filter(url => url.trim() !== '');
+    if (!editScreenshotFiles || editScreenshotFiles.length === 0) {
+      for (const url of activeGalleryUrls) {
+        try {
+          new URL(url);
+        } catch (_) {
+          alert(`Please enter a valid Gallery URL: "${url}"`);
+          return;
+        }
+      }
+    }
+
     setSubmittingAppEdit(true);
 
     try {
       let iconUrl = editingApp.icon_url;
       let bannerUrl = editingApp.banner_url;
       let apkUrl = editingApp.apk_url;
+      let galleryUrls = editingApp.gallery_urls || [];
 
+      // Update Icon
       if (editIconFile) {
         const url = await uploadEditFile(editIconFile, 'app-images');
         if (url) iconUrl = url;
+      } else if (editIconUrlInput.trim()) {
+        iconUrl = editIconUrlInput.trim();
       }
 
+      // Update Banner
       if (editBannerFile) {
         const url = await uploadEditFile(editBannerFile, 'app-images');
         if (url) {
@@ -591,12 +656,51 @@ export default function AdminDashboard() {
             image_url: url
           });
         }
+      } else if (editBannerUrlInput.trim()) {
+        bannerUrl = editBannerUrlInput.trim();
       }
 
+      // Update APK File
       if (editDownloadType === 'file' && editApkFile) {
         const url = await uploadEditFile(editApkFile, 'apks');
         if (url) apkUrl = url;
       }
+
+      // Update Screenshots & Gallery URLs
+      if (editScreenshotFiles && editScreenshotFiles.length > 0) {
+        galleryUrls = [];
+        // Delete old screenshots
+        await supabase.from('screenshots').delete().eq('app_id', editingApp.id);
+        
+        for (let i = 0; i < editScreenshotFiles.length; i++) {
+          const file = editScreenshotFiles[i];
+          const url = await uploadEditFile(file, 'app-images');
+          if (url) {
+            galleryUrls.push(url);
+            await supabase.from('screenshots').insert({
+              app_id: editingApp.id,
+              image_url: url
+            });
+          }
+        }
+      } else if (activeGalleryUrls.length > 0) {
+        galleryUrls = activeGalleryUrls;
+        // Sync with screenshots table
+        await supabase.from('screenshots').delete().eq('app_id', editingApp.id);
+        for (const url of galleryUrls) {
+          await supabase.from('screenshots').insert({
+            app_id: editingApp.id,
+            image_url: url
+          });
+        }
+      } else {
+        galleryUrls = [];
+        await supabase.from('screenshots').delete().eq('app_id', editingApp.id);
+      }
+
+      // Determine final image source type
+      const usedUpload = !!(editIconFile || editBannerFile || (editScreenshotFiles && editScreenshotFiles.length > 0));
+      const imageSourceType = usedUpload ? 'database_upload' : 'image_url';
 
       const payload: any = {
         name: editAppName,
@@ -612,7 +716,9 @@ export default function AdminDashboard() {
         file_type: editFileType,
         file_size: editFileSize,
         is_featured: editIsFeatured,
-        is_editor_choice: editIsEditorChoice
+        is_editor_choice: editIsEditorChoice,
+        gallery_urls: galleryUrls,
+        image_source_type: imageSourceType
       };
 
       if (editDownloadType === 'link') {
@@ -1347,26 +1453,200 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    {/* Graphics Upload Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-white/5">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Update App Icon (.png/.jpg - Optional)</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setEditIconFile(e.target.files?.[0] || null)}
-                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                        />
+                    {/* Graphics Upload / URLs Tab */}
+                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-white/5">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Graphics Source Method</label>
+                        <div className="flex bg-[#0d1220] border border-white/10 rounded-xl p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditImageSourceTab('upload')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                              editImageSourceTab === 'upload'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            Upload Files
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditImageSourceTab('url')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                              editImageSourceTab === 'url'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            Use Image URLs
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Update Banner Image (.png/.jpg - Optional)</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
-                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                        />
-                      </div>
+
+                      {editImageSourceTab === 'upload' ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Replace App Icon File (.png/.jpg)</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setEditIconFile(e.target.files?.[0] || null)}
+                                className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                              />
+                              {editIconFile ? (
+                                <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                                  <img src={URL.createObjectURL(editIconFile)} className="w-10 h-10 object-cover rounded-lg" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-white truncate font-semibold">{editIconFile.name}</p>
+                                    <p className="text-[8px] text-gray-400">New File Upload</p>
+                                  </div>
+                                  <button type="button" onClick={() => setEditIconFile(null)} className="text-red-400 hover:text-red-300 text-[10px] font-bold pr-1">Cancel</button>
+                                </div>
+                              ) : (
+                                editingApp.icon_url && (
+                                  <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                                    <img src={editingApp.icon_url} className="w-10 h-10 object-cover rounded-lg" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] text-gray-400 truncate">Current Icon</p>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Replace Banner Image (.png/.jpg)</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
+                                className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                              />
+                              {editBannerFile ? (
+                                <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                                  <img src={URL.createObjectURL(editBannerFile)} className="w-16 h-10 object-cover rounded-lg" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-white truncate font-semibold">{editBannerFile.name}</p>
+                                    <p className="text-[8px] text-gray-400">New File Upload</p>
+                                  </div>
+                                  <button type="button" onClick={() => setEditBannerFile(null)} className="text-red-400 hover:text-red-300 text-[10px] font-bold pr-1">Cancel</button>
+                                </div>
+                              ) : (
+                                editingApp.banner_url && (
+                                  <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                                    <img src={editingApp.banner_url} className="w-16 h-10 object-cover rounded-lg" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] text-gray-400 truncate">Current Banner</p>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Replace App Gallery / Screenshots (Select multiple, up to 4 images)</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => setEditScreenshotFiles(e.target.files)}
+                              className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                            />
+                            {editScreenshotFiles && editScreenshotFiles.length > 0 ? (
+                              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {Array.from(editScreenshotFiles).slice(0, 4).map((file, idx) => (
+                                  <div key={idx} className="relative group bg-[#0d1220] border border-white/10 rounded-xl p-1.5 flex flex-col justify-between">
+                                    <img src={URL.createObjectURL(file)} className="w-full h-16 object-cover rounded-lg" />
+                                    <div className="p-1 min-w-0 mt-1">
+                                      <p className="text-[9px] text-white truncate font-semibold">{file.name}</p>
+                                      <p className="text-[7px] text-gray-400">New File</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              editGalleryUrlInputs.some(url => url !== '') && (
+                                <div className="mt-3">
+                                  <p className="text-[10px] text-gray-500 mb-1.5">Current Screenshots Preview:</p>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {editGalleryUrlInputs.filter(url => url !== '').map((url, idx) => (
+                                      <div key={idx} className="relative group bg-[#0d1220] border border-white/10 rounded-xl p-1.5 flex flex-col justify-between">
+                                        <img src={url} className="w-full h-16 object-cover rounded-lg" />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">App Icon URL</label>
+                              <input
+                                type="url"
+                                value={editIconUrlInput}
+                                onChange={(e) => setEditIconUrlInput(e.target.value)}
+                                placeholder="https://example.com/icon.png"
+                                className="w-full px-3 py-2 text-xs glass-input"
+                              />
+                              {editIconUrlInput && (
+                                <div className="mt-2 p-1.5 bg-[#0d1220] border border-white/10 rounded-xl w-fit">
+                                  <img src={editIconUrlInput} className="w-10 h-10 object-cover rounded-lg" onError={(e) => { (e.target as any).style.display = 'none'; }} />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">App Banner Image URL</label>
+                              <input
+                                type="url"
+                                value={editBannerUrlInput}
+                                onChange={(e) => setEditBannerUrlInput(e.target.value)}
+                                placeholder="https://example.com/banner.jpg"
+                                className="w-full px-3 py-2 text-xs glass-input"
+                              />
+                              {editBannerUrlInput && (
+                                <div className="mt-2 p-1.5 bg-[#0d1220] border border-white/10 rounded-xl w-fit">
+                                  <img src={editBannerUrlInput} className="w-20 h-10 object-cover rounded-lg" onError={(e) => { (e.target as any).style.display = 'none'; }} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Gallery URLs */}
+                          <div className="pt-2 space-y-3">
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Gallery Image URLs (Up to 4)</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              {[0, 1, 2, 3].map((idx) => (
+                                <div key={idx} className="space-y-2 p-3 bg-[#0d1220] border border-white/10 rounded-xl">
+                                  <span className="text-[10px] font-bold text-gray-400 block">Screenshot {idx + 1}</span>
+                                  <input
+                                    type="url"
+                                    placeholder="https://example.com/screen.jpg"
+                                    value={editGalleryUrlInputs[idx]}
+                                    onChange={(e) => {
+                                      const updated = [...editGalleryUrlInputs];
+                                      updated[idx] = e.target.value;
+                                      setEditGalleryUrlInputs(updated);
+                                    }}
+                                    className="w-full px-2.5 py-1.5 text-[11px] glass-input"
+                                  />
+                                  {editGalleryUrlInputs[idx] && (
+                                    <div className="mt-1 w-full h-14 overflow-hidden rounded-lg border border-white/5">
+                                      <img src={editGalleryUrlInputs[idx]} className="w-full h-full object-cover" onError={(e) => { (e.target as any).style.display = 'none'; }} />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
@@ -1538,6 +1818,13 @@ export default function AdminDashboard() {
                               }`}>
                                 {app.download_type === 'link' ? 'External Link' : 'APK Upload'}
                               </span>
+                              <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                app.image_source_type === 'image_url'
+                                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                              }`}>
+                                Source: {app.image_source_type === 'image_url' ? 'External URLs' : 'Direct Database Upload'}
+                              </span>
                             </div>
                             {app.download_type === 'link' && app.download_url && (
                               <div className="mt-1">
@@ -1552,6 +1839,36 @@ export default function AdminDashboard() {
                               </div>
                             )}
                             <p className="text-xs text-gray-400 mt-2 max-w-xl line-clamp-2 leading-relaxed">{app.description}</p>
+                            
+                            {/* Graphics Previews */}
+                            <div className="mt-3 space-y-1.5">
+                              <span className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider">App Graphics Previews</span>
+                              <div className="flex flex-wrap gap-2.5 items-center">
+                                <div className="flex flex-col items-center gap-0.5 bg-[#0d1220] border border-white/5 p-1 rounded-lg">
+                                  <span className="text-[7px] font-semibold text-gray-400">Icon</span>
+                                  <img src={app.icon_url || ''} className="w-8 h-8 object-cover rounded" />
+                                </div>
+                                {app.banner_url && (
+                                  <div className="flex flex-col items-center gap-0.5 bg-[#0d1220] border border-white/5 p-1 rounded-lg">
+                                    <span className="text-[7px] font-semibold text-gray-400">Banner</span>
+                                    <img src={app.banner_url} className="w-14 h-8 object-cover rounded" />
+                                  </div>
+                                )}
+                                {((app.gallery_urls && app.gallery_urls.length > 0) || (app.screenshots && app.screenshots.length > 0)) && (
+                                  <div className="flex items-center gap-2 bg-[#0d1220] border border-white/5 p-1 rounded-lg">
+                                    <span className="text-[7px] font-semibold text-gray-400 px-1 block text-center">Gallery</span>
+                                    <div className="flex gap-1">
+                                      {(app.gallery_urls && app.gallery_urls.length > 0
+                                        ? app.gallery_urls
+                                        : (app.screenshots || []).map(s => s.image_url)
+                                      ).slice(0, 4).map((url, idx) => (
+                                        <img key={idx} src={url} className="w-12 h-8 object-cover rounded" />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
 

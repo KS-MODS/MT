@@ -79,6 +79,21 @@ export default function DeveloperPortal() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
+  // Image Source Tab
+  const [imageSourceTab, setImageSourceTab] = useState<'upload' | 'url'>('upload');
+
+  // Image URL option inputs
+  const [iconUrlInput, setIconUrlInput] = useState('');
+  const [bannerUrlInput, setBannerUrlInput] = useState('');
+  const [galleryUrlInputs, setGalleryUrlInputs] = useState<string[]>(['', '', '', '']);
+
+  // URL Validation states
+  const [iconUrlStatus, setIconUrlStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [bannerUrlStatus, setBannerUrlStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [galleryUrlStatuses, setGalleryUrlStatuses] = useState<('idle' | 'validating' | 'valid' | 'invalid')[]>([
+    'idle', 'idle', 'idle', 'idle'
+  ]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/');
@@ -102,6 +117,86 @@ export default function DeveloperPortal() {
     }
     loadCategories();
   }, []);
+
+  // Validate image URL helper
+  const validateImageUrl = (url: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!url) {
+        resolve(false);
+        return;
+      }
+      try {
+        new URL(url);
+      } catch (_) {
+        resolve(false);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  };
+
+  // Debounced validation effects
+  useEffect(() => {
+    if (!iconUrlInput) {
+      setIconUrlStatus('idle');
+      return;
+    }
+    setIconUrlStatus('validating');
+    const handler = setTimeout(async () => {
+      const isValid = await validateImageUrl(iconUrlInput);
+      setIconUrlStatus(isValid ? 'valid' : 'invalid');
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [iconUrlInput]);
+
+  useEffect(() => {
+    if (!bannerUrlInput) {
+      setBannerUrlStatus('idle');
+      return;
+    }
+    setBannerUrlStatus('validating');
+    const handler = setTimeout(async () => {
+      const isValid = await validateImageUrl(bannerUrlInput);
+      setBannerUrlStatus(isValid ? 'valid' : 'invalid');
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [bannerUrlInput]);
+
+  useEffect(() => {
+    const activeUrls = galleryUrlInputs.map((url, i) => ({ url, index: i })).filter(item => item.url !== '');
+    if (activeUrls.length === 0) {
+      setGalleryUrlStatuses(['idle', 'idle', 'idle', 'idle']);
+      return;
+    }
+
+    setGalleryUrlStatuses(prev => {
+      const copy = [...prev];
+      for (let i = 0; i < 4; i++) {
+        if (galleryUrlInputs[i] && prev[i] === 'idle') {
+          copy[i] = 'validating';
+        } else if (!galleryUrlInputs[i]) {
+          copy[i] = 'idle';
+        }
+      }
+      return copy;
+    });
+
+    const handler = setTimeout(async () => {
+      const results = await Promise.all(
+        galleryUrlInputs.map(async (url) => {
+          if (!url) return 'idle';
+          const isValid = await validateImageUrl(url);
+          return isValid ? 'valid' : 'invalid';
+        })
+      );
+      setGalleryUrlStatuses(results);
+    }, 600);
+
+    return () => clearTimeout(handler);
+  }, [galleryUrlInputs]);
 
   useEffect(() => {
     if (!user) return;
@@ -208,6 +303,33 @@ export default function DeveloperPortal() {
       }
     }
 
+    // Image validations (URL Option)
+    if (!iconFile && iconUrlInput.trim()) {
+      const isValid = await validateImageUrl(iconUrlInput.trim());
+      if (!isValid) {
+        alert('The App Icon URL does not point to a valid image or could not be loaded.');
+        return;
+      }
+    }
+    if (!bannerFile && bannerUrlInput.trim()) {
+      const isValid = await validateImageUrl(bannerUrlInput.trim());
+      if (!isValid) {
+        alert('The App Banner URL does not point to a valid image or could not be loaded.');
+        return;
+      }
+    }
+
+    const activeGalleryUrls = galleryUrlInputs.filter(url => url.trim() !== '');
+    if (!screenshotFiles || screenshotFiles.length === 0) {
+      for (const url of activeGalleryUrls) {
+        const isValid = await validateImageUrl(url);
+        if (!isValid) {
+          alert(`The gallery URL "${url}" does not point to a valid image or could not be loaded.`);
+          return;
+        }
+      }
+    }
+
     setSubmitting(true);
     setUploadProgress(10);
 
@@ -215,12 +337,15 @@ export default function DeveloperPortal() {
       let iconUrl = '';
       let bannerUrl = '';
       let apkUrl = '';
+      let galleryUrls: string[] = [];
 
       // Upload icon
       if (iconFile) {
         setUploadProgress(30);
         const url = await uploadFile(iconFile, 'app-images');
         if (url) iconUrl = url;
+      } else if (iconUrlInput.trim()) {
+        iconUrl = iconUrlInput.trim();
       }
 
       // Upload banner
@@ -228,6 +353,8 @@ export default function DeveloperPortal() {
         setUploadProgress(60);
         const url = await uploadFile(bannerFile, 'app-images');
         if (url) bannerUrl = url;
+      } else if (bannerUrlInput.trim()) {
+        bannerUrl = bannerUrlInput.trim();
       }
 
       // Upload APK (only if file)
@@ -237,10 +364,28 @@ export default function DeveloperPortal() {
         if (url) apkUrl = url;
       }
 
+      // Upload additional screenshots or use URLs
+      if (screenshotFiles && screenshotFiles.length > 0) {
+        setUploadProgress(90);
+        for (let i = 0; i < screenshotFiles.length; i++) {
+          const file = screenshotFiles[i];
+          const url = await uploadFile(file, 'app-images');
+          if (url) {
+            galleryUrls.push(url);
+          }
+        }
+      } else {
+        galleryUrls = activeGalleryUrls;
+      }
+
       setUploadProgress(95);
 
       // Create slug from name
       const slug = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+      // Determine image source type
+      const usedUpload = !!(iconFile || bannerFile || (screenshotFiles && screenshotFiles.length > 0));
+      const imageSourceType = usedUpload ? 'database_upload' : 'image_url';
 
       const insertPayload = {
         developer_id: user.id,
@@ -259,7 +404,9 @@ export default function DeveloperPortal() {
         package_name: downloadType === 'link' && packageName ? packageName : null,
         file_type: fileType,
         file_size: fileSize || '0 MB',
-        status: 'pending' // Admin must approve
+        status: 'pending', // Admin must approve
+        gallery_urls: galleryUrls,
+        image_source_type: imageSourceType
       };
       console.log('Inserting app submission payload:', insertPayload);
 
@@ -277,7 +424,7 @@ export default function DeveloperPortal() {
 
       console.log('App submission successfully inserted:', data);
 
-      // Add to screenshot gallery if banner uploaded
+      // Add to screenshot gallery if banner uploaded/provided
       if (bannerUrl && data) {
         await supabase.from('screenshots').insert({
           app_id: data.id,
@@ -287,16 +434,11 @@ export default function DeveloperPortal() {
 
       // Add additional screenshots if uploaded
       if (screenshotFiles && screenshotFiles.length > 0 && data) {
-        setUploadProgress(90);
-        for (let i = 0; i < screenshotFiles.length; i++) {
-          const file = screenshotFiles[i];
-          const url = await uploadFile(file, 'app-images');
-          if (url) {
-            await supabase.from('screenshots').insert({
-              app_id: data.id,
-              image_url: url
-            });
-          }
+        for (const url of galleryUrls) {
+          await supabase.from('screenshots').insert({
+            app_id: data.id,
+            image_url: url
+          });
         }
       }
 
@@ -317,6 +459,14 @@ export default function DeveloperPortal() {
       setBannerFile(null);
       setApkFile(null);
       setScreenshotFiles(null);
+      
+      setIconUrlInput('');
+      setBannerUrlInput('');
+      setGalleryUrlInputs(['', '', '', '']);
+      setIconUrlStatus('idle');
+      setBannerUrlStatus('idle');
+      setGalleryUrlStatuses(['idle', 'idle', 'idle', 'idle']);
+
       setActiveTab('my_apps');
       
       // Reload apps list
@@ -741,51 +891,233 @@ export default function DeveloperPortal() {
                 </div>
               )}
 
-              {/* File Upload Grid */}
-              <div className={`grid grid-cols-1 ${downloadType === 'file' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6 pt-4 border-t border-gray-100 dark:border-white/5`}>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">App Icon File (.png/.jpg)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIconFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                  />
+              {/* Image Source Selection Toggle */}
+              <div className="space-y-2 pt-4 border-t border-gray-100 dark:border-white/5">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Graphics Source Method</label>
+                <div className="flex bg-[#0d1220] border border-white/10 rounded-xl p-1 w-full max-w-xs">
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceTab('upload')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${
+                      imageSourceTab === 'upload'
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Upload Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceTab('url')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${
+                      imageSourceTab === 'url'
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Use Image URLs
+                  </button>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">App Banner Image (.png/.jpg)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                  />
-                </div>
+              {imageSourceTab === 'upload' ? (
+                <>
+                  {/* File Upload Grid */}
+                  <div className={`grid grid-cols-1 ${downloadType === 'file' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6 pt-4 border-t border-gray-100 dark:border-white/5`}>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">App Icon File (.png/.jpg)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setIconFile(e.target.files?.[0] || null)}
+                        className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                      />
+                      {iconFile && (
+                        <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                          <img src={URL.createObjectURL(iconFile)} className="w-10 h-10 object-cover rounded-lg" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-white truncate font-semibold">{iconFile.name}</p>
+                            <p className="text-[8px] text-gray-400">{(iconFile.size / 1024).toFixed(1)} KB</p>
+                          </div>
+                          <button type="button" onClick={() => setIconFile(null)} className="text-red-400 hover:text-red-300 text-[10px] font-bold pr-1">Remove</button>
+                        </div>
+                      )}
+                    </div>
 
-                {downloadType === 'file' && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">APK File Upload (.apk)</label>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">App Banner Image (.png/.jpg)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
+                        className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                      />
+                      {bannerFile && (
+                        <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                          <img src={URL.createObjectURL(bannerFile)} className="w-16 h-10 object-cover rounded-lg" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-white truncate font-semibold">{bannerFile.name}</p>
+                            <p className="text-[8px] text-gray-400">{(bannerFile.size / 1024).toFixed(1)} KB</p>
+                          </div>
+                          <button type="button" onClick={() => setBannerFile(null)} className="text-red-400 hover:text-red-300 text-[10px] font-bold pr-1">Remove</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {downloadType === 'file' && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">APK File Upload (.apk)</label>
+                        <input
+                          type="file"
+                          accept=".apk"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            setApkFile(file);
+                            if (file) {
+                              setFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+                            }
+                          }}
+                          className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                        />
+                        {apkFile && (
+                          <div className="mt-3 flex items-center gap-3 p-2 bg-[#0d1220] border border-white/10 rounded-xl max-w-sm">
+                            <div className="flex-1 min-w-0 pl-1">
+                              <p className="text-[10px] text-white truncate font-semibold">{apkFile.name}</p>
+                              <p className="text-[8px] text-gray-400">{(apkFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                            </div>
+                            <button type="button" onClick={() => { setApkFile(null); setFileSize('0 MB'); }} className="text-red-400 hover:text-red-300 text-[10px] font-bold pr-1">Remove</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">App Gallery / Screenshots (Select multiple, up to 4 images)</label>
                     <input
                       type="file"
-                      accept=".apk"
-                      onChange={(e) => setApkFile(e.target.files?.[0] || null)}
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => setScreenshotFiles(e.target.files)}
                       className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
                     />
+                    {screenshotFiles && screenshotFiles.length > 0 && (
+                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {Array.from(screenshotFiles).slice(0, 4).map((file, idx) => (
+                          <div key={idx} className="relative group bg-[#0d1220] border border-white/10 rounded-xl p-1.5 flex flex-col justify-between">
+                            <img src={URL.createObjectURL(file)} className="w-full h-20 object-cover rounded-lg" />
+                            <div className="p-1 min-w-0 mt-1">
+                              <p className="text-[9px] text-white truncate font-semibold">{file.name}</p>
+                              <p className="text-[7px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <>
+                  {/* Image URLs Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-white/5">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide">App Icon URL</label>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          iconUrlStatus === 'valid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                          iconUrlStatus === 'invalid' ? 'bg-red-500/15 text-red-400 border border-red-500/25' :
+                          iconUrlStatus === 'validating' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25 animate-pulse' :
+                          'bg-white/5 text-gray-500 border border-white/10'
+                        }`}>
+                          {iconUrlStatus === 'valid' ? 'Valid Link' :
+                           iconUrlStatus === 'invalid' ? 'Invalid Link' :
+                           iconUrlStatus === 'validating' ? 'Validating...' : 'Empty'}
+                        </span>
+                      </div>
+                      <input
+                        type="url"
+                        value={iconUrlInput}
+                        onChange={(e) => setIconUrlInput(e.target.value)}
+                        placeholder="https://example.com/images/icon.png"
+                        className="w-full px-3 py-2 text-xs glass-input"
+                      />
+                      {iconUrlStatus === 'valid' && iconUrlInput && (
+                        <div className="mt-2 p-1.5 bg-[#0d1220] border border-white/10 rounded-xl w-fit">
+                          <img src={iconUrlInput} className="w-12 h-12 object-cover rounded-lg" />
+                        </div>
+                      )}
+                    </div>
 
-              <div className="pt-4 border-t border-gray-100 dark:border-white/5">
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">App Gallery / Screenshots (Select multiple, up to 4 images)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => setScreenshotFiles(e.target.files)}
-                  className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
-                />
-              </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide">App Banner Image URL</label>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          bannerUrlStatus === 'valid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                          bannerUrlStatus === 'invalid' ? 'bg-red-500/15 text-red-400 border border-red-500/25' :
+                          bannerUrlStatus === 'validating' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25 animate-pulse' :
+                          'bg-white/5 text-gray-500 border border-white/10'
+                        }`}>
+                          {bannerUrlStatus === 'valid' ? 'Valid Link' :
+                           bannerUrlStatus === 'invalid' ? 'Invalid Link' :
+                           bannerUrlStatus === 'validating' ? 'Validating...' : 'Empty'}
+                        </span>
+                      </div>
+                      <input
+                        type="url"
+                        value={bannerUrlInput}
+                        onChange={(e) => setBannerUrlInput(e.target.value)}
+                        placeholder="https://example.com/images/banner.jpg"
+                        className="w-full px-3 py-2 text-xs glass-input"
+                      />
+                      {bannerUrlStatus === 'valid' && bannerUrlInput && (
+                        <div className="mt-2 p-1.5 bg-[#0d1220] border border-white/10 rounded-xl w-fit">
+                          <img src={bannerUrlInput} className="w-24 h-12 object-cover rounded-lg" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Gallery URLs section */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-white/5 space-y-4">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Gallery Image URLs (Up to 4)</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[0, 1, 2, 3].map((idx) => (
+                        <div key={idx} className="space-y-2 p-3 bg-[#0d1220] border border-white/10 rounded-xl">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-gray-400">Screenshot {idx + 1}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                              galleryUrlStatuses[idx] === 'valid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
+                              galleryUrlStatuses[idx] === 'invalid' ? 'bg-red-500/15 text-red-400 border border-red-500/25' :
+                              galleryUrlStatuses[idx] === 'validating' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25 animate-pulse' :
+                              'bg-white/5 text-gray-500 border border-white/10'
+                            }`}>
+                              {galleryUrlStatuses[idx] === 'valid' ? 'Valid' :
+                               galleryUrlStatuses[idx] === 'invalid' ? 'Invalid' :
+                               galleryUrlStatuses[idx] === 'validating' ? 'Checking...' : 'Empty'}
+                            </span>
+                          </div>
+                          <input
+                            type="url"
+                            placeholder="https://example.com/screen.jpg"
+                            value={galleryUrlInputs[idx]}
+                            onChange={(e) => {
+                              const updated = [...galleryUrlInputs];
+                              updated[idx] = e.target.value;
+                              setGalleryUrlInputs(updated);
+                            }}
+                            className="w-full px-2.5 py-1.5 text-[11px] glass-input"
+                          />
+                          {galleryUrlStatuses[idx] === 'valid' && galleryUrlInputs[idx] && (
+                            <div className="mt-1 w-full h-16 overflow-hidden rounded-lg border border-white/5">
+                              <img src={galleryUrlInputs[idx]} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Progress bar */}
               {submitting && (

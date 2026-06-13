@@ -52,6 +52,8 @@ export interface App {
   display_order?: number;
   file_type?: 'APK' | 'XAPK' | 'ZIP' | 'EXE' | 'APKM' | 'Other';
   file_size?: string | null;
+  gallery_urls?: string[] | null;
+  image_source_type?: 'database_upload' | 'image_url' | null;
   // Relations
   developer?: Profile;
   screenshots?: Screenshot[];
