@@ -158,3 +158,10 @@ export interface FeaturedBanner {
   featured_app?: App;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+

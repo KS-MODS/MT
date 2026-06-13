@@ -2050,7 +2050,7 @@ CREATE POLICY "Allow admin all" ON featured_banner FOR ALL TO authenticated USIN
                             required
                             disabled={!!editingFeaturedApp.id}
                             value={editingFeaturedApp.app_id || ''}
-                            onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, app_id: e.target.value }))}
+                            onChange={(e) => setEditingFeaturedApp((prev: any) => ({ ...prev, app_id: e.target.value }))}
                             className="w-full px-3 py-2 text-xs glass-input select-arrow bg-[#0d1220]"
                           >
                             <option value="">-- Select approved app --</option>
@@ -2095,7 +2095,7 @@ CREATE POLICY "Allow admin all" ON featured_banner FOR ALL TO authenticated USIN
                           <input
                             type="number"
                             value={editingFeaturedApp.display_order}
-                            onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
+                            onChange={(e) => setEditingFeaturedApp((prev: any) => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
                             className="w-full px-3 py-1.5 text-xs glass-input"
                           />
                         </div>
@@ -2105,7 +2105,7 @@ CREATE POLICY "Allow admin all" ON featured_banner FOR ALL TO authenticated USIN
                             <input
                               type="checkbox"
                               checked={editingFeaturedApp.is_active}
-                              onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, is_active: e.target.checked }))}
+                              onChange={(e) => setEditingFeaturedApp((prev: any) => ({ ...prev, is_active: e.target.checked }))}
                               className="rounded text-blue-600 border-white/10 w-4 h-4"
                             />
                             <span className="text-xs font-bold text-gray-300">Active Slider Item</span>
