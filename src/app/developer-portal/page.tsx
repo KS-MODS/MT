@@ -432,8 +432,8 @@ export default function DeveloperPortal() {
         });
       }
 
-      // Add additional screenshots if uploaded
-      if (screenshotFiles && screenshotFiles.length > 0 && data) {
+      // Add additional screenshots
+      if (galleryUrls && galleryUrls.length > 0 && data) {
         for (const url of galleryUrls) {
           await supabase.from('screenshots').insert({
             app_id: data.id,

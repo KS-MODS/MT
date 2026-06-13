@@ -67,20 +67,19 @@ export default function AppDetailsPage({ params }: PageProps) {
           .from('screenshots')
           .select('*')
           .eq('app_id', currentApp.id);
-        if (screenData && screenData.length > 0) {
-          setScreenshots(screenData || []);
-        } else if (currentApp.gallery_urls && currentApp.gallery_urls.length > 0) {
-          setScreenshots(
-            currentApp.gallery_urls.map((url, index) => ({
-              id: `gallery-url-${index}-${currentApp.id}`,
-              app_id: currentApp.id,
-              image_url: url,
-              created_at: currentApp.created_at
-            }))
-          );
-        } else {
-          setScreenshots([]);
-        }
+        
+        const dbUrls = screenData ? screenData.map(s => s.image_url) : [];
+        const galleryUrls = currentApp.gallery_urls || [];
+        const uniqueUrls = Array.from(new Set([...dbUrls, ...galleryUrls]));
+
+        setScreenshots(
+          uniqueUrls.map((url, index) => ({
+            id: `gallery-url-${index}-${currentApp.id}`,
+            app_id: currentApp.id,
+            image_url: url,
+            created_at: currentApp.created_at
+          }))
+        );
 
         // Fetch reviews
         const { data: reviewData } = await supabase

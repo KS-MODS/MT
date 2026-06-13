@@ -537,7 +537,7 @@ export default function AdminDashboard() {
     setEditIsEditorChoice(app.is_editor_choice || false);
 
     // Image URL inputs & tabs
-    setEditImageSourceTab(app.image_source_type || 'database_upload');
+    setEditImageSourceTab(app.image_source_type === 'image_url' ? 'url' : 'upload');
     setEditIconUrlInput(app.icon_url || '');
     setEditBannerUrlInput(app.banner_url || '');
 
