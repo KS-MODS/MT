@@ -172,6 +172,17 @@ export default function UserProfilePage() {
     reviewer: { label: 'Star Reviewer', desc: 'Left detailed feedback reviews', color: 'bg-amber-50 text-amber-600 border-amber-100' },
   };
 
+  if (loading) {
+    return (
+      <LayoutShell>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
+          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider animate-pulse">Loading Profile...</p>
+        </div>
+      </LayoutShell>
+    );
+  }
+
   if (!user) {
     return (
       <LayoutShell>
@@ -384,7 +395,7 @@ export default function UserProfilePage() {
                     <p className="text-xs text-slate-400 py-4 text-center">You haven't followed any developers yet.</p>
                   ) : (
                     <div className="divide-y divide-slate-100 max-h-[240px] overflow-y-auto pr-1">
-                      {followingDevs.map(f => (
+                      {followingDevs.filter(f => f.following).map(f => (
                         <div key={f.id} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
                           <Link href={`/developer/${f.following?.username}`} className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
                             <div className="w-7 h-7 rounded bg-blue-500/10 overflow-hidden flex items-center justify-center font-bold text-[10px] text-blue-500 uppercase flex-shrink-0">

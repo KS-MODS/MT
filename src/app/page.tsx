@@ -56,7 +56,7 @@ export default function StoreHome() {
     return () => clearInterval(interval);
   }, [banners.length, isHovered]);
 
-  const categories = ['All', 'Games', 'Tools', 'Health', 'Music', 'Productivity', 'News'];
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -104,6 +104,13 @@ export default function StoreHome() {
 
         setApps(appsData as App[] || []);
         setDevelopers(devsData as Profile[] || []);
+
+        // Fetch active categories ordered by display_order
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('*')
+          .order('display_order', { ascending: true });
+        setDbCategories(categoriesData || []);
       } catch (err) {
         console.error('Failed to load store data:', err);
       } finally {
@@ -315,18 +322,35 @@ export default function StoreHome() {
             Browse Categories
           </h2>
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:-mx-0 md:px-0">
-            {categories.map(cat => (
+            <button
+              disabled={loading}
+              onClick={() => setActiveCategory('All')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border min-h-[44px] flex items-center gap-1.5 ${
+                activeCategory === 'All'
+                  ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/15'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              🌐 All
+            </button>
+            {dbCategories.map(cat => (
               <button
-                key={cat}
+                key={cat.id || cat.name}
                 disabled={loading}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border min-h-[44px] ${
-                  activeCategory === cat
+                onClick={() => setActiveCategory(cat.name)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border min-h-[44px] flex items-center gap-1.5 ${
+                  activeCategory.toLowerCase() === cat.name.toLowerCase()
                     ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/15'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                 }`}
+                style={
+                  activeCategory.toLowerCase() === cat.name.toLowerCase() && cat.color
+                    ? { backgroundColor: cat.color, borderColor: cat.color }
+                    : {}
+                }
               >
-                {cat}
+                {cat.icon && <span className="mr-1">{cat.icon}</span>}
+                {cat.name}
               </button>
             ))}
           </div>

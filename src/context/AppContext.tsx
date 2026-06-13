@@ -53,7 +53,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('Error fetching profile:', error);
         setProfile(null);
       } else {
-        setProfile(data as Profile);
+        const prof = data as Profile;
+        setProfile(prof);
+
+        // Security check: if banned and login ban is enabled, log them out
+        if (prof.is_banned) {
+          const { data: settingsData } = await supabase
+            .from('store_settings')
+            .select('login_ban_enabled')
+            .single();
+
+          if (settingsData?.login_ban_enabled) {
+            if (typeof window !== 'undefined') {
+              alert('Your account has been banned by store administrators. Access denied.');
+            }
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setNotifications([]);
+            router.push('/');
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to get profile:', err);

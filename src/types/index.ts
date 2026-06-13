@@ -11,6 +11,12 @@ export interface Profile {
   twitter_url: string | null;
   created_at: string;
   updated_at: string;
+  // Moderation fields
+  is_banned?: boolean;
+  ban_reason?: string | null;
+  is_suspended?: boolean;
+  suspended_until?: string | null;
+  warning_count?: number;
   // Computed fields
   total_downloads?: number;
   total_likes?: number;
@@ -44,6 +50,8 @@ export interface App {
   download_url?: string | null;
   package_name?: string | null;
   display_order?: number;
+  file_type?: 'APK' | 'XAPK' | 'ZIP' | 'EXE' | 'APKM' | 'Other';
+  file_size?: string | null;
   // Relations
   developer?: Profile;
   screenshots?: Screenshot[];
@@ -122,13 +130,15 @@ export interface Notification {
 export interface Report {
   id: string;
   user_id: string | null;
-  app_id: string;
+  app_id: string | null;
   reason: string;
   details: string | null;
   status: 'pending' | 'resolved';
   created_at: string;
+  reported_user_id?: string | null;
   app?: App;
   user?: Profile;
+  reported_user?: Profile;
 }
 
 export interface Badge {
@@ -163,5 +173,8 @@ export interface Category {
   name: string;
   slug: string;
   created_at: string;
+  icon?: string | null;
+  color?: string | null;
+  display_order?: number;
 }
 

@@ -388,7 +388,7 @@ export default function AppDetailsPage({ params }: PageProps) {
 
             {/* Developer link */}
             <div className="flex items-center gap-1.5 text-sm">
-              <Link href={`/developer/${app.developer?.username}`} className="text-blue-500 font-semibold hover:underline flex items-center gap-1">
+              <Link href={`/profile/${app.developer?.username}`} className="text-blue-500 font-semibold hover:underline flex items-center gap-1">
                 {app.developer?.full_name}
                 {app.developer?.is_verified && <ShieldCheck className="w-4 h-4 text-blue-500" />}
               </Link>
@@ -402,7 +402,7 @@ export default function AppDetailsPage({ params }: PageProps) {
                 className="btn-primary py-2.5 px-6 font-bold text-sm bg-gradient-to-r from-blue-600 to-indigo-700 border-none shadow-md shadow-blue-500/10 min-h-[44px]"
               >
                 <Download className="w-4 h-4" />
-                {downloading ? 'Processing...' : 'Download APK'}
+                {downloading ? 'Processing...' : `Download ${app.file_type || 'APK'}`}
               </button>
 
               <button
@@ -527,16 +527,18 @@ export default function AppDetailsPage({ params }: PageProps) {
                   comments.map(c => (
                     <div key={c.id} className="space-y-3">
                       <div className="flex gap-3 text-left">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex-shrink-0 overflow-hidden flex items-center justify-center font-bold text-xs uppercase">
+                        <Link href={`/profile/${c.user?.username}`} className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex-shrink-0 overflow-hidden flex items-center justify-center font-bold text-xs uppercase hover:opacity-85 transition-opacity">
                           {c.user?.avatar_url ? (
                             <img src={c.user.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                           ) : (
                             c.user?.username?.[0] || 'U'
                           )}
-                        </div>
+                        </Link>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-700">{c.user?.full_name}</span>
+                            <Link href={`/profile/${c.user?.username}`} className="text-xs font-bold text-slate-700 hover:text-blue-500 hover:underline">
+                              {c.user?.full_name}
+                            </Link>
                             <span className="text-[9px] text-slate-400">@{c.user?.username}</span>
                             <span className="text-[8px] text-slate-400 ml-auto">{new Date(c.created_at).toLocaleDateString()}</span>
                           </div>
@@ -579,16 +581,18 @@ export default function AppDetailsPage({ params }: PageProps) {
                       {/* Replies List */}
                       {c.replies && c.replies.map(reply => (
                         <div key={reply.id} className="flex gap-3 pl-11 text-left">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex-shrink-0 overflow-hidden flex items-center justify-center font-bold text-[10px] uppercase">
+                          <Link href={`/profile/${reply.user?.username}`} className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex-shrink-0 overflow-hidden flex items-center justify-center font-bold text-[10px] uppercase hover:opacity-85 transition-opacity">
                             {reply.user?.avatar_url ? (
                               <img src={reply.user.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                             ) : (
                               reply.user?.username?.[0] || 'U'
                             )}
-                          </div>
+                          </Link>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-bold text-slate-700">{reply.user?.full_name}</span>
+                              <Link href={`/profile/${reply.user?.username}`} className="text-[11px] font-bold text-slate-700 hover:text-blue-500 hover:underline">
+                                {reply.user?.full_name}
+                              </Link>
                               <span className="text-[8px] text-slate-400 font-medium">@{reply.user?.username}</span>
                               <span className="text-[8px] text-slate-400 ml-auto">{new Date(reply.created_at).toLocaleDateString()}</span>
                             </div>
@@ -612,6 +616,14 @@ export default function AppDetailsPage({ params }: PageProps) {
                 <div className="flex justify-between py-1.5 border-b border-slate-100">
                   <span className="text-slate-400">Category</span>
                   <span className="font-semibold text-slate-700">{app.category}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-400">File Type</span>
+                  <span className="font-semibold text-slate-700">{app.file_type || 'APK'}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-400">File Size</span>
+                  <span className="font-semibold text-slate-700">{app.file_size || '0 MB'}</span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-slate-100">
                   <span className="text-slate-400">Version</span>
@@ -709,18 +721,18 @@ export default function AppDetailsPage({ params }: PageProps) {
                     <div key={r.id} className="p-3.5 rounded-xl border border-slate-100 space-y-2 bg-slate-50/50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-6 h-6 rounded bg-slate-200 overflow-hidden flex items-center justify-center font-bold text-[10px] uppercase text-slate-500 flex-shrink-0">
-                            {r.user?.avatar_url ? (
-                              <img src={r.user.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                            ) : (
-                              r.user?.username?.[0] || 'U'
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-700 truncate max-w-[120px]">
-                              {r.user?.full_name}
-                            </p>
-                          </div>
+                        <Link href={`/profile/${r.user?.username}`} className="w-6 h-6 rounded bg-slate-200 overflow-hidden flex items-center justify-center font-bold text-[10px] uppercase text-slate-500 flex-shrink-0 hover:opacity-85 transition-opacity">
+                          {r.user?.avatar_url ? (
+                            <img src={r.user.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            r.user?.username?.[0] || 'U'
+                          )}
+                        </Link>
+                        <div className="min-w-0">
+                          <Link href={`/profile/${r.user?.username}`} className="text-xs font-bold text-slate-700 hover:text-blue-500 hover:underline block truncate max-w-[120px]">
+                            {r.user?.full_name}
+                          </Link>
+                        </div>
                         </div>
 
                         <div className="flex gap-0.5 flex-shrink-0">

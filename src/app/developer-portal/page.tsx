@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { App, Profile } from '@/types';
+import { App, Profile, Category } from '@/types';
 import { useApp } from '@/context/AppContext';
 import LayoutShell from '@/components/LayoutShell';
 import {
@@ -67,6 +67,9 @@ export default function DeveloperPortal() {
   const [downloadType, setDownloadType] = useState<'file' | 'link'>('file');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [packageName, setPackageName] = useState('');
+  const [fileType, setFileType] = useState<'APK' | 'XAPK' | 'ZIP' | 'EXE' | 'APKM' | 'Other'>('APK');
+  const [fileSize, setFileSize] = useState('0 MB');
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
   
   // File upload states
   const [iconFile, setIconFile] = useState<File | null>(null);
@@ -81,6 +84,24 @@ export default function DeveloperPortal() {
       router.push('/');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const { data } = await supabase
+          .from('categories')
+          .select('*')
+          .order('display_order', { ascending: true });
+        if (data && data.length > 0) {
+          setDbCategories(data as Category[]);
+          setCategory(data[0].name);
+        }
+      } catch (err) {
+        console.error('Failed to load categories in dev portal:', err);
+      }
+    }
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -138,6 +159,16 @@ export default function DeveloperPortal() {
     if (!user || !profile) return;
     if (profile.role !== 'developer' && profile.role !== 'admin') {
       alert('Only registered developers can upload applications.');
+      return;
+    }
+
+    // Moderation security check
+    if (profile.is_banned) {
+      alert('Your account is banned. Uploading applications is blocked.');
+      return;
+    }
+    if (profile.is_suspended && profile.suspended_until && new Date(profile.suspended_until) > new Date()) {
+      alert(`Your account is suspended until ${new Date(profile.suspended_until).toLocaleString()}. Uploading applications is blocked.`);
       return;
     }
 
@@ -226,6 +257,8 @@ export default function DeveloperPortal() {
         download_type: downloadType,
         download_url: downloadType === 'link' ? downloadUrl : null,
         package_name: downloadType === 'link' && packageName ? packageName : null,
+        file_type: fileType,
+        file_size: fileSize || '0 MB',
         status: 'pending' // Admin must approve
       };
       console.log('Inserting app submission payload:', insertPayload);
@@ -278,6 +311,8 @@ export default function DeveloperPortal() {
       setDownloadType('file');
       setDownloadUrl('');
       setPackageName('');
+      setFileType('APK');
+      setFileSize('0 MB');
       setIconFile(null);
       setBannerFile(null);
       setApkFile(null);
@@ -596,14 +631,51 @@ export default function DeveloperPortal() {
                       onChange={(e) => setCategory(e.target.value)}
                       className="w-full px-3 py-2 text-xs glass-input select-arrow"
                     >
-                      <option value="Games">Games</option>
-                      <option value="Tools">Tools</option>
-                      <option value="Health">Health</option>
-                      <option value="Music">Music</option>
-                      <option value="Productivity">Productivity</option>
-                      <option value="News">News</option>
+                      {dbCategories.length > 0 ? (
+                        dbCategories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Games">Games</option>
+                          <option value="Tools">Tools</option>
+                          <option value="Health">Health</option>
+                          <option value="Music">Music</option>
+                          <option value="Productivity">Productivity</option>
+                          <option value="News">News</option>
+                        </>
+                      )}
                     </select>
                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">File Type</label>
+                  <select
+                    value={fileType}
+                    onChange={(e) => setFileType(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs glass-input select-arrow"
+                  >
+                    <option value="APK">APK</option>
+                    <option value="XAPK">XAPK</option>
+                    <option value="ZIP">ZIP</option>
+                    <option value="EXE">EXE</option>
+                    <option value="APKM">APKM</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">File Size</label>
+                  <input
+                    type="text"
+                    required
+                    value={fileSize}
+                    onChange={(e) => setFileSize(e.target.value)}
+                    placeholder="e.g. 45 MB"
+                    className="w-full px-3 py-2 text-xs glass-input"
+                  />
                 </div>
               </div>
 

@@ -73,7 +73,7 @@ export default function AllAppsPage() {
         const { data: categoriesData } = await supabase
           .from('categories')
           .select('*')
-          .order('name', { ascending: true });
+          .order('display_order', { ascending: true });
         setCategories(categoriesData || []);
 
         // 3. Fetch approved apps
@@ -386,12 +386,18 @@ export default function AllAppsPage() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.name)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all min-h-[32px] ${
-                    selectedCategory === cat.name
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all min-h-[32px] flex items-center gap-1.5 ${
+                    selectedCategory.toLowerCase() === cat.name.toLowerCase()
                       ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
                   }`}
+                  style={
+                    selectedCategory.toLowerCase() === cat.name.toLowerCase() && cat.color
+                      ? { backgroundColor: cat.color, borderColor: cat.color }
+                      : {}
+                  }
                 >
+                  {cat.icon && <span className="mr-0.5">{cat.icon}</span>}
                   {cat.name}
                 </button>
               ))}
