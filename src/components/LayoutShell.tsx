@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { usePathname, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import AuthModal from './AuthModal';
 import {
   Home,
@@ -25,6 +26,7 @@ import {
   Mail,
   Phone,
   Clock,
+  LayoutGrid,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -53,6 +55,25 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [allAppsEnabled, setAllAppsEnabled] = useState(true);
+
+  // Fetch settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const { data, error } = await supabase
+          .from('store_settings')
+          .select('all_apps_enabled')
+          .single();
+        if (!error && data) {
+          setAllAppsEnabled(data.all_apps_enabled);
+        }
+      } catch (err) {
+        console.error('Failed to load settings in layout:', err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   // Close menus on path change
   useEffect(() => {
@@ -70,13 +91,20 @@ export default function LayoutShell({ children }: LayoutShellProps) {
 
   const navLinks = [
     { name: 'Store Home', href: '/', icon: Home },
+  ];
+
+  if (allAppsEnabled) {
+    navLinks.push({ name: 'All Apps', href: '/all-apps', icon: LayoutGrid });
+  }
+
+  navLinks.push(
     { name: 'Explore Search', href: '/search', icon: Search },
     {
       name: 'Developer Portal',
       href: '/developer-portal',
       icon: FolderCode,
-    },
-  ];
+    }
+  );
 
   // Add Admin Panel link if user is admin
   if (profile?.role === 'admin') {
@@ -493,6 +521,18 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           <Home className="w-5 h-5" />
           Home
         </Link>
+        {allAppsEnabled && (
+          <Link
+            href="/all-apps"
+            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/all-apps'
+              ? 'text-blue-500 dark:text-blue-400'
+              : 'text-gray-400 dark:text-gray-500'
+              }`}
+          >
+            <LayoutGrid className="w-5 h-5" />
+            All Apps
+          </Link>
+        )}
         <Link
           href="/search"
           className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] gap-1 text-[9px] font-semibold transition-all ${pathname === '/search'

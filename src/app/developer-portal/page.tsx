@@ -72,6 +72,7 @@ export default function DeveloperPortal() {
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [apkFile, setApkFile] = useState<File | null>(null);
+  const [screenshotFiles, setScreenshotFiles] = useState<FileList | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -251,6 +252,21 @@ export default function DeveloperPortal() {
         });
       }
 
+      // Add additional screenshots if uploaded
+      if (screenshotFiles && screenshotFiles.length > 0 && data) {
+        setUploadProgress(90);
+        for (let i = 0; i < screenshotFiles.length; i++) {
+          const file = screenshotFiles[i];
+          const url = await uploadFile(file, 'app-images');
+          if (url) {
+            await supabase.from('screenshots').insert({
+              app_id: data.id,
+              image_url: url
+            });
+          }
+        }
+      }
+
       alert('App uploaded successfully! It is now pending administrator review.');
       
       // Reset form
@@ -265,6 +281,7 @@ export default function DeveloperPortal() {
       setIconFile(null);
       setBannerFile(null);
       setApkFile(null);
+      setScreenshotFiles(null);
       setActiveTab('my_apps');
       
       // Reload apps list
@@ -685,6 +702,17 @@ export default function DeveloperPortal() {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">App Gallery / Screenshots (Select multiple, up to 4 images)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setScreenshotFiles(e.target.files)}
+                  className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                />
               </div>
 
               {/* Progress bar */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { App, Profile, Report, FeaturedBanner } from '@/types';
 import { useApp } from '@/context/AppContext';
@@ -59,7 +59,40 @@ export default function AdminDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'stats' | 'moderate' | 'manage_apps' | 'developers' | 'users' | 'reports' | 'featured_banner'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'moderate' | 'manage_apps' | 'developers' | 'users' | 'reports' | 'featured_banner' | 'all_apps_mgmt'>('stats');
+
+  // All Apps Management States
+  const [storeSettings, setStoreSettings] = useState({
+    id: '',
+    all_apps_enabled: true,
+    slider_autoplay_speed: 4000,
+    show_downloads_count: true,
+    show_ratings: true,
+    install_button_enabled: true
+  });
+  const [submittingSettings, setSubmittingSettings] = useState(false);
+
+  // Featured Apps List State
+  const [adminFeaturedApps, setAdminFeaturedApps] = useState<any[]>([]);
+  const [editingFeaturedApp, setEditingFeaturedApp] = useState<any | null>(null);
+  const [featuredAppFile, setFeaturedAppFile] = useState<File | null>(null);
+  const [featuredAppPreview, setFeaturedAppPreview] = useState('');
+  const [submittingFeaturedApp, setSubmittingFeaturedApp] = useState(false);
+
+  // Dynamic Categories State
+  const [adminCategories, setAdminCategories] = useState<any[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategory, setEditingCategory] = useState<any | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [submittingCategory, setSubmittingCategory] = useState(false);
+
+  // App Display Order
+  const [appOrderList, setAppOrderList] = useState<App[]>([]);
+  const [savingAppOrder, setSavingAppOrder] = useState(false);
+
+  // HTML5 Drag and drop refs
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
 
   // Manage Apps States
   const [editingApp, setEditingApp] = useState<App | null>(null);
@@ -167,6 +200,45 @@ export default function AdminDashboard() {
         console.warn('featured_banner table query failed. Ensure schema SQL is run.', bannersErr);
         setTableExists(false);
       }
+
+      // Fetch store settings safely
+      try {
+        const { data: settingsData } = await supabase
+          .from('store_settings')
+          .select('*')
+          .single();
+        if (settingsData) {
+          setStoreSettings(settingsData);
+        }
+      } catch (err) {
+        console.warn('Failed to load store settings for admin:', err);
+      }
+
+      // Fetch categories safely
+      try {
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('*')
+          .order('name', { ascending: true });
+        setAdminCategories(categoriesData || []);
+      } catch (err) {
+        console.warn('Failed to load categories for admin:', err);
+      }
+
+      // Fetch featured apps safely
+      try {
+        const { data: featuredData } = await supabase
+          .from('featured_apps')
+          .select('*, app:apps(*)')
+          .order('display_order', { ascending: true });
+        setAdminFeaturedApps(featuredData || []);
+      } catch (err) {
+        console.warn('Failed to load featured apps for admin:', err);
+      }
+
+      // Initialize App display order list
+      const approvedApps = appsList.filter(a => a.status === 'approved');
+      setAppOrderList(approvedApps);
 
       // Aggregate Counters
       const totalDownloads = appsList.reduce((acc, a) => acc + a.download_count, 0);
@@ -475,6 +547,214 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- All Apps Management Handlers ---
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('store_settings')
+        .update(storeSettings)
+        .eq('id', storeSettings.id);
+      if (error) throw error;
+      alert('Settings updated successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to update settings');
+    } finally {
+      setSubmittingSettings(false);
+    }
+  };
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setSubmittingCategory(true);
+    try {
+      const slug = newCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({ name: newCategoryName.trim(), slug })
+        .select()
+        .single();
+      if (error) throw error;
+      setAdminCategories(prev => [...prev, data]);
+      setNewCategoryName('');
+      alert('Category added successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to add category');
+    } finally {
+      setSubmittingCategory(false);
+    }
+  };
+
+  const handleEditCategorySave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory || !editCategoryName.trim()) return;
+    setSubmittingCategory(true);
+    try {
+      const slug = editCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const { data, error } = await supabase
+        .from('categories')
+        .update({ name: editCategoryName.trim(), slug })
+        .eq('id', editingCategory.id)
+        .select()
+        .single();
+      if (error) throw error;
+      setAdminCategories(prev => prev.map(c => c.id === editingCategory.id ? data : c));
+      setEditingCategory(null);
+      setEditCategoryName('');
+      alert('Category updated successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to update category');
+    } finally {
+      setSubmittingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      setAdminCategories(prev => prev.filter(c => c.id !== id));
+      alert('Category deleted successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete category');
+    }
+  };
+
+  const handleSaveFeaturedApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFeaturedApp.app_id) {
+      alert('Please select an application');
+      return;
+    }
+    setSubmittingFeaturedApp(true);
+    try {
+      let bannerUrl = editingFeaturedApp.banner_image || '';
+
+      if (featuredAppFile) {
+        const fileExt = featuredAppFile.name.split('.').pop();
+        const fileName = `featured_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `banners/${user?.id}/${fileName}`;
+        const { error } = await supabase.storage.from('app-images').upload(filePath, featuredAppFile, { cacheControl: '3600', upsert: true });
+        if (error) throw error;
+        bannerUrl = supabase.storage.from('app-images').getPublicUrl(filePath).data.publicUrl;
+      }
+
+      const payload = {
+        app_id: editingFeaturedApp.app_id,
+        banner_image: bannerUrl,
+        display_order: parseInt(editingFeaturedApp.display_order) || 0,
+        is_active: !!editingFeaturedApp.is_active
+      };
+
+      if (editingFeaturedApp.id) {
+        const { data, error } = await supabase
+          .from('featured_apps')
+          .update(payload)
+          .eq('id', editingFeaturedApp.id)
+          .select('*, app:apps(*)')
+          .single();
+        if (error) throw error;
+        setAdminFeaturedApps(prev => prev.map(f => f.id === editingFeaturedApp.id ? data : f));
+        alert('Featured app updated successfully!');
+      } else {
+        const { data, error } = await supabase
+          .from('featured_apps')
+          .insert(payload)
+          .select('*, app:apps(*)')
+          .single();
+        if (error) throw error;
+        setAdminFeaturedApps(prev => [data, ...prev]);
+        alert('Featured app created successfully!');
+      }
+
+      setEditingFeaturedApp(null);
+      setFeaturedAppFile(null);
+      setFeaturedAppPreview('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to save featured app');
+    } finally {
+      setSubmittingFeaturedApp(false);
+    }
+  };
+
+  const handleDeleteFeaturedApp = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this featured app slider?')) return;
+    try {
+      const { error } = await supabase
+        .from('featured_apps')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      setAdminFeaturedApps(prev => prev.filter(f => f.id !== id));
+      alert('Featured app deleted successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete featured app');
+    }
+  };
+
+  const handleSaveAppOrder = async () => {
+    setSavingAppOrder(true);
+    try {
+      for (const appItem of appOrderList) {
+        await supabase
+          .from('apps')
+          .update({ display_order: appItem.display_order })
+          .eq('id', appItem.id);
+      }
+      alert('App display order updated successfully!');
+      loadAdminData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save app display order');
+    } finally {
+      setSavingAppOrder(false);
+    }
+  };
+
+  const handleDragStart = (index: number) => {
+    dragItem.current = index;
+  };
+
+  const handleDragEnter = (index: number) => {
+    dragOverItem.current = index;
+  };
+
+  const handleDragEnd = async () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    
+    const listCopy = [...adminFeaturedApps];
+    const draggedItemContent = listCopy[dragItem.current];
+    listCopy.splice(dragItem.current, 1);
+    listCopy.splice(dragOverItem.current, 0, draggedItemContent);
+    
+    const updatedList = listCopy.map((item, idx) => ({
+      ...item,
+      display_order: idx
+    }));
+
+    setAdminFeaturedApps(updatedList);
+    
+    try {
+      for (const item of updatedList) {
+        await supabase
+          .from('featured_apps')
+          .update({ display_order: item.display_order })
+          .eq('id', item.id);
+      }
+    } catch (err) {
+      console.error('Failed to save drag reordering:', err);
+    }
+
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
   // Simulated chart data
   const chartData = {
     labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6'],
@@ -540,7 +820,8 @@ export default function AdminDashboard() {
               { id: 'developers', label: 'Verifications' },
               { id: 'users', label: 'User Roles' },
               { id: 'reports', label: `Reports (${reports.filter(r => r.status === 'pending').length})` },
-              { id: 'featured_banner', label: 'Featured Banner' }
+              { id: 'featured_banner', label: 'Featured Banner' },
+              { id: 'all_apps_mgmt', label: 'All Apps Management' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1638,6 +1919,443 @@ CREATE POLICY "Allow admin all" ON featured_banner FOR ALL TO authenticated USIN
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'all_apps_mgmt' && (
+              <div className="space-y-8">
+                {/* 1. Global Settings Section */}
+                <div className="glass-card p-6 bg-[#131926]/40 border border-white/5 space-y-6">
+                  <div>
+                    <h3 className="text-md font-bold font-outfit text-white">Global Store & All Apps Settings</h3>
+                    <p className="text-xs text-gray-400">Enable/disable directories, ratings display, download details, and slider autoplay settings</p>
+                  </div>
+                  <form onSubmit={handleSaveSettings} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <label className="flex items-center gap-3 p-3 border border-white/5 bg-[#131926]/60 rounded-xl cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={storeSettings.all_apps_enabled}
+                          onChange={(e) => setStoreSettings(prev => ({ ...prev, all_apps_enabled: e.target.checked }))}
+                          className="rounded text-blue-600 focus:ring-blue-500/20 border-white/10 w-4 h-4"
+                        />
+                        <div>
+                          <span className="block text-xs font-bold text-white">Enable All Apps Page</span>
+                          <span className="block text-[10px] text-gray-400">Allow users to visit the All Apps directory page</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center gap-3 p-3 border border-white/5 bg-[#131926]/60 rounded-xl cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={storeSettings.show_downloads_count}
+                          onChange={(e) => setStoreSettings(prev => ({ ...prev, show_downloads_count: e.target.checked }))}
+                          className="rounded text-blue-600 focus:ring-blue-500/20 border-white/10 w-4 h-4"
+                        />
+                        <div>
+                          <span className="block text-xs font-bold text-white">Show Downloads Count</span>
+                          <span className="block text-[10px] text-gray-400">Show count on app detail pages and cards</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center gap-3 p-3 border border-white/5 bg-[#131926]/60 rounded-xl cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={storeSettings.show_ratings}
+                          onChange={(e) => setStoreSettings(prev => ({ ...prev, show_ratings: e.target.checked }))}
+                          className="rounded text-blue-600 focus:ring-blue-500/20 border-white/10 w-4 h-4"
+                        />
+                        <div>
+                          <span className="block text-xs font-bold text-white">Show Star Ratings</span>
+                          <span className="block text-[10px] text-gray-400">Show ratings and reviews on apps</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center gap-3 p-3 border border-white/5 bg-[#131926]/60 rounded-xl cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={storeSettings.install_button_enabled}
+                          onChange={(e) => setStoreSettings(prev => ({ ...prev, install_button_enabled: e.target.checked }))}
+                          className="rounded text-blue-600 focus:ring-blue-500/20 border-white/10 w-4 h-4"
+                        />
+                        <div>
+                          <span className="block text-xs font-bold text-white">Enable Install Button</span>
+                          <span className="block text-[10px] text-gray-400">Enable install buttons on home/all-apps card lists</span>
+                        </div>
+                      </label>
+
+                      <div className="p-3 border border-white/5 bg-[#131926]/60 rounded-xl">
+                        <label className="block text-xs font-bold text-white mb-1">Carousel Autoplay Speed (ms)</label>
+                        <input
+                          type="number"
+                          value={storeSettings.slider_autoplay_speed}
+                          onChange={(e) => setStoreSettings(prev => ({ ...prev, slider_autoplay_speed: parseInt(e.target.value) || 4000 }))}
+                          placeholder="4000"
+                          className="w-full px-3 py-1.5 text-xs glass-input"
+                          min="1000"
+                          step="500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={submittingSettings}
+                        className="btn-primary py-2 px-6 text-xs font-bold shadow min-h-[36px]"
+                      >
+                        {submittingSettings ? 'Updating...' : 'Save Settings'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 2. Featured Slider Apps Section */}
+                <div className="glass-card p-6 bg-[#131926]/40 border border-white/5 space-y-6">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                    <div>
+                      <h3 className="text-md font-bold font-outfit text-white">Featured Apps Slider (Carousel)</h3>
+                      <p className="text-xs text-gray-400">Manage, upload custom banner images, and drag-and-drop to reorder carousel slides</p>
+                    </div>
+                    {!editingFeaturedApp && (
+                      <button
+                        onClick={() => {
+                          setEditingFeaturedApp({
+                            app_id: '',
+                            banner_image: '',
+                            display_order: adminFeaturedApps.length,
+                            is_active: true
+                          });
+                          setFeaturedAppFile(null);
+                          setFeaturedAppPreview('');
+                        }}
+                        className="px-3.5 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow min-h-[36px]"
+                      >
+                        <Plus className="w-4 h-4" /> Add Featured App
+                      </button>
+                    )}
+                  </div>
+
+                  {editingFeaturedApp ? (
+                    /* Add / Edit Featured App Form */
+                    <form onSubmit={handleSaveFeaturedApp} className="p-4 border border-white/5 rounded-2xl bg-[#131926]/20 space-y-4">
+                      <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wide border-b border-white/5 pb-1.5">
+                        {editingFeaturedApp.id ? 'Edit Featured Slider App' : 'Add App to Featured Slider'}
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-1">Select Application</label>
+                          <select
+                            required
+                            disabled={!!editingFeaturedApp.id}
+                            value={editingFeaturedApp.app_id || ''}
+                            onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, app_id: e.target.value }))}
+                            className="w-full px-3 py-2 text-xs glass-input select-arrow bg-[#0d1220]"
+                          >
+                            <option value="">-- Select approved app --</option>
+                            {apps.filter(a => a.status === 'approved').map(app => (
+                              <option key={app.id} value={app.id}>{app.name} (v{app.version})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-1">Upload Banner Image (1200x400 recommended)</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setFeaturedAppFile(file);
+                              if (file) setFeaturedAppPreview(URL.createObjectURL(file));
+                            }}
+                            className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Display Preview */}
+                      {(featuredAppPreview || editingFeaturedApp.banner_image) && (
+                        <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/5">
+                          <img
+                            src={featuredAppPreview || editingFeaturedApp.banner_image}
+                            alt="Banner Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">
+                            Live Banner Preview
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-1">Display Order Weight</label>
+                          <input
+                            type="number"
+                            value={editingFeaturedApp.display_order}
+                            onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
+                            className="w-full px-3 py-1.5 text-xs glass-input"
+                          />
+                        </div>
+
+                        <div className="flex items-center pt-5">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={editingFeaturedApp.is_active}
+                              onChange={(e) => setEditingFeaturedApp(prev => ({ ...prev, is_active: e.target.checked }))}
+                              className="rounded text-blue-600 border-white/10 w-4 h-4"
+                            />
+                            <span className="text-xs font-bold text-gray-300">Active Slider Item</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 border-t border-white/5 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingFeaturedApp(null);
+                            setFeaturedAppFile(null);
+                            setFeaturedAppPreview('');
+                          }}
+                          className="px-4 py-2 border border-white/10 hover:bg-white/5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submittingFeaturedApp}
+                          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors shadow min-h-[36px]"
+                        >
+                          {submittingFeaturedApp ? 'Saving...' : 'Save Featured Item'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* Slider Apps List with Drag-and-Drop Reordering */
+                    <div className="space-y-2">
+                      {adminFeaturedApps.length === 0 ? (
+                        <p className="text-xs text-gray-400 py-8 text-center">No featured apps currently in the slider carousel.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2">
+                          {adminFeaturedApps.map((item, index) => (
+                            <div
+                              key={item.id}
+                              draggable
+                              onDragStart={() => handleDragStart(index)}
+                              onDragEnter={() => handleDragEnter(index)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => e.preventDefault()}
+                              className="flex items-center justify-between p-3 border border-white/5 hover:border-blue-500/20 bg-[#131926]/20 hover:bg-[#131926]/40 rounded-xl transition-all cursor-move select-none group"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* Grip Icon and order number */}
+                                <div className="text-gray-400 flex items-center gap-1.5 font-mono text-xs font-bold">
+                                  <span>☰</span>
+                                  <span className="w-4 text-center">{index + 1}</span>
+                                </div>
+
+                                {/* Banner Thumbnail */}
+                                <div className="w-14 h-8 rounded-lg overflow-hidden border border-white/5 bg-[#0b0f19] flex-shrink-0">
+                                  <img
+                                    src={item.banner_image || item.app?.banner_url || ''}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+
+                                {/* App Info */}
+                                <div>
+                                  <h4 className="text-xs font-bold text-white">{item.app?.name || 'Unknown App'}</h4>
+                                  <span className="block text-[9px] text-gray-400">Order weight: {item.display_order} • Status: {item.is_active ? 'Active' : 'Disabled'}</span>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingFeaturedApp({ ...item });
+                                    setFeaturedAppPreview(item.banner_image || '');
+                                    setFeaturedAppFile(null);
+                                  }}
+                                  className="px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/25 rounded-lg text-[10px] font-semibold transition-all"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFeaturedApp(item.id)}
+                                  className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg text-[10px] font-semibold transition-all"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Category Management Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Category Form & List */}
+                  <div className="lg:col-span-2 glass-card p-6 bg-[#131926]/40 border border-white/5 space-y-6">
+                    <div>
+                      <h3 className="text-md font-bold font-outfit text-white">Dynamic Store Categories</h3>
+                      <p className="text-xs text-gray-400">Create, edit, and delete dynamic categories that filter All Apps page results</p>
+                    </div>
+
+                    <div className="divide-y divide-white/5">
+                      {adminCategories.length === 0 ? (
+                        <p className="text-xs text-gray-400 py-8 text-center">No categories registered in the store.</p>
+                      ) : (
+                        adminCategories.map(cat => (
+                          <div key={cat.id} className="py-3 flex items-center justify-between first:pt-0 last:pb-0">
+                            <div>
+                              <h4 className="text-xs font-bold text-white">{cat.name}</h4>
+                              <span className="block text-[9px] text-gray-500">Slug: {cat.slug}</span>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingCategory(cat);
+                                  setEditCategoryName(cat.name);
+                                }}
+                                className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/25 rounded-lg text-[10px] font-semibold transition-all"
+                              >
+                                Edit Name
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCategory(cat.id)}
+                                className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg text-[10px] font-semibold transition-all"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add / Edit Category Input form */}
+                  <div className="glass-card p-6 bg-[#131926]/40 border border-white/5 space-y-4">
+                    {editingCategory ? (
+                      <form onSubmit={handleEditCategorySave} className="space-y-3">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wide">Edit Category</h4>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Category Name</label>
+                          <input
+                            type="text"
+                            required
+                            value={editCategoryName}
+                            onChange={(e) => setEditCategoryName(e.target.value)}
+                            className="w-full px-3 py-1.5 text-xs glass-input"
+                          />
+                        </div>
+
+                        <div className="flex gap-2 pt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCategory(null);
+                              setEditCategoryName('');
+                            }}
+                            className="flex-1 px-3 py-1.5 border border-white/10 hover:bg-white/5 rounded-lg text-[10px] font-semibold text-gray-400 transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={submittingCategory}
+                            className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold transition-all shadow"
+                          >
+                            {submittingCategory ? 'Saving...' : 'Save'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleAddCategory} className="space-y-3">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wide">Add New Category</h4>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Category Name</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Productivity"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="w-full px-3 py-1.5 text-xs glass-input"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={submittingCategory}
+                          className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors shadow min-h-[32px]"
+                        >
+                          {submittingCategory ? 'Adding...' : 'Create Category'}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. App Display Ordering Section */}
+                <div className="glass-card p-6 bg-[#131926]/40 border border-white/5 space-y-6">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                    <div>
+                      <h3 className="text-md font-bold font-outfit text-white">App Display Order Configuration</h3>
+                      <p className="text-xs text-gray-400">Configure sorting and display weights of approved apps inside the All Apps directory grid</p>
+                    </div>
+                    <button
+                      onClick={handleSaveAppOrder}
+                      disabled={savingAppOrder}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow min-h-[36px]"
+                    >
+                      {savingAppOrder ? 'Saving Order...' : 'Save Display Order'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {appOrderList.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-4 col-span-full text-center">No approved applications to order.</p>
+                    ) : (
+                      appOrderList.map((appItem, idx) => (
+                        <div key={appItem.id} className="p-3 border border-white/5 bg-[#131926]/20 rounded-xl flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded bg-slate-900 border border-white/5 overflow-hidden flex-shrink-0">
+                              <img src={appItem.icon_url || ''} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-bold text-white truncate">{appItem.name}</h4>
+                              <span className="block text-[8px] text-gray-500 uppercase tracking-wide font-semibold">{appItem.category}</span>
+                            </div>
+                          </div>
+
+                          <div className="w-16 flex-shrink-0">
+                            <input
+                              type="number"
+                              value={appItem.display_order || 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setAppOrderList(prev => prev.map(a => a.id === appItem.id ? { ...a, display_order: val } : a));
+                              }}
+                              className="w-full px-2 py-1 text-center text-xs glass-input"
+                              min="0"
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </>

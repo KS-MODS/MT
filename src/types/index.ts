@@ -43,6 +43,7 @@ export interface App {
   download_type?: 'file' | 'link';
   download_url?: string | null;
   package_name?: string | null;
+  display_order?: number;
   // Relations
   developer?: Profile;
   screenshots?: Screenshot[];
